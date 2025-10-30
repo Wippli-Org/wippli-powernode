@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Validate token format
-  if (!token.match(/^pn_exec_[a-zA-Z0-9]+$/)) {
+  if (!token.match(/^pn_exec_[a-zA-Z0-9_]+$/)) {
     return res.status(400).json({ error: 'Invalid token format' });
   }
 
