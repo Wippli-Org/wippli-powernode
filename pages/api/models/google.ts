@@ -48,9 +48,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({
       error: error.message,
       fallback: [
-        { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
-        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+        // Gemini 2.5 Series (Latest - 2025)
+        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro ⭐ LATEST' },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+        { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+
+        // Gemini 2.0 Series (2025)
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+        { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
+        { id: 'gemini-2.0-pro', name: 'Gemini 2.0 Pro (Experimental)' },
+
+        // Gemini 1.5 Series (Legacy - 2024)
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Legacy)' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Legacy)' },
       ]
     });
   }
