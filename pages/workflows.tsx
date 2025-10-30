@@ -280,6 +280,111 @@ export default function WorkflowsPage() {
     );
   };
 
+  const addLogToNode = (nodeId: string, logMessage: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const log = `${timestamp}: ${logMessage}`;
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                logs: [...(node.data.logs || []), log],
+              },
+            }
+          : node
+      )
+    );
+  };
+
+  const handleTestNode = async (node: Node) => {
+    addLogToNode(node.id, 'Test started...');
+
+    try {
+      // Call the agent API with the node context
+      const response = await fetch('/api/agent-test-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          node: {
+            id: node.id,
+            type: node.data.type,
+            label: node.data.label,
+            config: node.data.config,
+          },
+          action: 'test',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        addLogToNode(node.id, `✓ Test passed: ${result.message || 'Success'}`);
+        if (result.details) {
+          result.details.forEach((detail: string) => addLogToNode(node.id, detail));
+        }
+      } else {
+        addLogToNode(node.id, `✗ Test failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      addLogToNode(node.id, `✗ Error: ${error.message}`);
+    }
+  };
+
+  const handleDebugNode = async (node: Node) => {
+    addLogToNode(node.id, 'Debug started...');
+    addLogToNode(node.id, 'Sending context to AI agent for debugging...');
+
+    try {
+      // Call the agent API with full context for debugging
+      const response = await fetch('/api/agent-test-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          node: {
+            id: node.id,
+            type: node.data.type,
+            label: node.data.label,
+            config: node.data.config,
+            logs: node.data.logs || [],
+          },
+          action: 'debug',
+          context: {
+            workflow: activeWorkflow?.name,
+            connectedNodes: edges
+              .filter(e => e.source === node.id || e.target === node.id)
+              .map(e => ({
+                direction: e.source === node.id ? 'outgoing' : 'incoming',
+                nodeId: e.source === node.id ? e.target : e.source,
+              })),
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        addLogToNode(node.id, `✓ Debug complete`);
+        if (result.analysis) {
+          addLogToNode(node.id, `Analysis: ${result.analysis}`);
+        }
+        if (result.suggestions) {
+          result.suggestions.forEach((suggestion: string) =>
+            addLogToNode(node.id, `→ ${suggestion}`)
+          );
+        }
+        if (result.fixes) {
+          addLogToNode(node.id, `Applied fixes: ${result.fixes}`);
+        }
+      } else {
+        addLogToNode(node.id, `✗ Debug failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      addLogToNode(node.id, `✗ Error: ${error.message}`);
+    }
+  };
+
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -678,6 +783,42 @@ export default function WorkflowsPage() {
                         className="w-full h-48 px-2 py-2 text-xs border border-gray-300 rounded font-mono focus:ring-2 focus:ring-primary focus:border-transparent"
                         placeholder='{\n  "key": "value"\n}'
                       />
+                    </div>
+
+                    {/* Test and Debug Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleTestNode(selectedNode)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        <TestTube className="w-4 h-4" />
+                        Test
+                      </button>
+                      <button
+                        onClick={() => handleDebugNode(selectedNode)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium"
+                      >
+                        <Bug className="w-4 h-4" />
+                        Debug
+                      </button>
+                    </div>
+
+                    {/* Logs Section */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Logs
+                      </label>
+                      <div className="w-full h-32 px-2 py-2 text-xs border border-gray-300 rounded bg-gray-900 text-gray-100 font-mono overflow-y-auto">
+                        {selectedNode.data.logs && selectedNode.data.logs.length > 0 ? (
+                          selectedNode.data.logs.map((log: string, idx: number) => (
+                            <div key={idx} className="mb-1">
+                              {log}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-gray-500 italic">No logs yet</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
