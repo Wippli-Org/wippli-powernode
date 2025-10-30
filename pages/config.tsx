@@ -94,7 +94,18 @@ export default function ConfigPage() {
       const response = await fetch('/api/config');
       if (response.ok) {
         const data = await response.json();
-        setConfig({ ...config, ...data });
+
+        // Merge providers properly - if API returns empty providers, use defaults
+        const mergedProviders = {
+          ...config.providers,
+          ...(data.providers && Object.keys(data.providers).length > 0 ? data.providers : {}),
+        };
+
+        setConfig({
+          ...config,
+          ...data,
+          providers: mergedProviders,
+        });
       }
     } catch (err) {
       console.error('Failed to load config:', err);
