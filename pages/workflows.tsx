@@ -299,83 +299,124 @@ export default function WorkflowsPage() {
   };
 
   const handleTestNode = async (node: Node) => {
-    addLogToNode(node.id, 'Test started...');
+    addLogToNode(node.id, 'Test started - validating configuration...');
 
-    try {
-      // Call the agent API with the node context
-      const response = await fetch('/api/agent-test-node', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          node: {
-            id: node.id,
-            type: node.data.type,
-            label: node.data.label,
-            config: node.data.config,
-          },
-          action: 'test',
-        }),
-      });
+    // Basic validation logic
+    const errors: string[] = [];
+    const typeInfo = INSTRUCTION_TYPES[node.data.type as InstructionType];
 
-      const result = await response.json();
+    if (!node.data.config || Object.keys(node.data.config).length === 0) {
+      addLogToNode(node.id, '⚠ Warning: Node configuration is empty');
+    }
 
-      if (response.ok) {
-        addLogToNode(node.id, `✓ Test passed: ${result.message || 'Success'}`);
-        if (result.details) {
-          result.details.forEach((detail: string) => addLogToNode(node.id, detail));
+    // Type-specific validations
+    switch (node.data.type) {
+      case 'read':
+      case 'write':
+      case 'edit':
+      case 'delete':
+        if (!node.data.config.path && !node.data.config.file) {
+          errors.push('File path is required');
+        } else {
+          addLogToNode(node.id, '✓ File path configured');
         }
-      } else {
-        addLogToNode(node.id, `✗ Test failed: ${result.error || 'Unknown error'}`);
-      }
-    } catch (error: any) {
-      addLogToNode(node.id, `✗ Error: ${error.message}`);
+        break;
+      case 'http':
+        if (!node.data.config.url) {
+          errors.push('URL is required');
+        } else {
+          addLogToNode(node.id, '✓ URL configured');
+        }
+        break;
+      case 'search':
+        if (!node.data.config.query && !node.data.config.pattern) {
+          errors.push('Query or pattern is required');
+        } else {
+          addLogToNode(node.id, '✓ Search query configured');
+        }
+        break;
+      default:
+        addLogToNode(node.id, '✓ Basic validation passed');
+    }
+
+    if (errors.length > 0) {
+      errors.forEach(err => addLogToNode(node.id, `✗ ${err}`));
+      addLogToNode(node.id, 'Test failed - fix errors above');
+    } else {
+      addLogToNode(node.id, '✓ All tests passed - node ready');
     }
   };
 
   const handleDebugNode = async (node: Node) => {
     addLogToNode(node.id, 'Debug started...');
-    addLogToNode(node.id, 'Sending context to AI agent for debugging...');
+    addLogToNode(node.id, 'Sending to AI agent with full context...');
 
     try {
-      // Call the agent API with full context for debugging
-      const response = await fetch('/api/agent-test-node', {
+      // Get wippli_id from localStorage
+      const wippli_id = localStorage.getItem('wippli_id') || 'default-user';
+
+      // Get or create conversation for workflow debugging
+      const conversationId = `workflow-debug-${activeWorkflow?.id || 'unknown'}`;
+
+      // Build context message for the AI
+      const connectedNodes = edges
+        .filter(e => e.source === node.id || e.target === node.id)
+        .map(e => {
+          const targetNodeId = e.source === node.id ? e.target : e.source;
+          const targetNode = nodes.find(n => n.id === targetNodeId);
+          return {
+            direction: e.source === node.id ? 'outgoing' : 'incoming',
+            type: targetNode?.data.type,
+            label: targetNode?.data.label,
+          };
+        });
+
+      const contextMessage = `Please debug this workflow node and provide specific suggestions:
+
+**Node Information:**
+- Type: ${node.data.type}
+- Label: ${node.data.label || 'Untitled'}
+- Configuration: ${JSON.stringify(node.data.config, null, 2)}
+
+**Workflow Context:**
+- Workflow: ${activeWorkflow?.name || 'Unknown'}
+- Connected Nodes: ${connectedNodes.length > 0 ? connectedNodes.map(n => `${n.direction} → ${n.label} (${n.type})`).join(', ') : 'No connections'}
+
+**Previous Logs:**
+${node.data.logs && node.data.logs.length > 0 ? node.data.logs.join('\n') : 'No previous logs'}
+
+Please analyze this node and provide:
+1. Any issues or problems with the configuration
+2. Specific actionable suggestions for fixes
+3. Best practices for this type of node`;
+
+      // Call the existing chat API to maintain conversation context
+      const response = await fetch('/api/chat-with-mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          node: {
-            id: node.id,
-            type: node.data.type,
-            label: node.data.label,
-            config: node.data.config,
-            logs: node.data.logs || [],
-          },
-          action: 'debug',
-          context: {
-            workflow: activeWorkflow?.name,
-            connectedNodes: edges
-              .filter(e => e.source === node.id || e.target === node.id)
-              .map(e => ({
-                direction: e.source === node.id ? 'outgoing' : 'incoming',
-                nodeId: e.source === node.id ? e.target : e.source,
-              })),
-          },
+          wippli_id,
+          conversation_id: conversationId,
+          message: contextMessage,
         }),
       });
 
       const result = await response.json();
 
-      if (response.ok) {
-        addLogToNode(node.id, `✓ Debug complete`);
-        if (result.analysis) {
-          addLogToNode(node.id, `Analysis: ${result.analysis}`);
-        }
-        if (result.suggestions) {
-          result.suggestions.forEach((suggestion: string) =>
-            addLogToNode(node.id, `→ ${suggestion}`)
-          );
-        }
-        if (result.fixes) {
-          addLogToNode(node.id, `Applied fixes: ${result.fixes}`);
+      if (response.ok && result.message) {
+        addLogToNode(node.id, '✓ AI agent response received');
+
+        // Parse AI response and add to logs
+        const aiResponse = result.message;
+        const lines = aiResponse.split('\n').slice(0, 5); // First 5 lines
+        lines.forEach(line => {
+          if (line.trim()) {
+            addLogToNode(node.id, line.trim());
+          }
+        });
+
+        if (aiResponse.split('\n').length > 5) {
+          addLogToNode(node.id, '... (check Chat page for full response)');
         }
       } else {
         addLogToNode(node.id, `✗ Debug failed: ${result.error || 'Unknown error'}`);
