@@ -687,15 +687,15 @@ I will automatically apply this corrected configuration to the node.`;
           </div>
 
           {/* Instruction Types Sidebar - Drag square icons */}
-          <div className="col-span-2 h-full border-r border-gray-200 bg-white overflow-y-auto">
+          <div className="col-span-1 h-full border-r border-gray-200 bg-white overflow-y-auto">
             <div className="p-3 border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-700">Drag Icons</h2>
+              <h2 className="text-sm font-semibold text-gray-700 text-center">Icons</h2>
             </div>
             <div className="p-3 space-y-4">
               {/* File Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">File Ops</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">File Ops</h3>
+                <div className="flex flex-col items-center gap-3">
                   {(['read', 'write', 'edit', 'delete', 'search', 'save'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
                     const Icon = typeInfo.icon;
@@ -708,12 +708,12 @@ I will automatically apply this corrected configuration to the node.`;
                         title={typeInfo.label}
                       >
                         <div
-                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          className="w-16 h-16 rounded shadow-md border-2 bg-white flex items-center justify-center"
                           style={{ borderColor: typeInfo.color }}
                         >
-                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                          <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -724,8 +724,8 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* AI Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">AI Ops</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">AI Ops</h3>
+                <div className="flex flex-col items-center gap-3">
                   {(['transform', 'extract', 'analyse', 'translate'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
                     const Icon = typeInfo.icon;
@@ -738,12 +738,12 @@ I will automatically apply this corrected configuration to the node.`;
                         title={typeInfo.label}
                       >
                         <div
-                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          className="w-16 h-16 rounded shadow-md border-2 bg-white flex items-center justify-center"
                           style={{ borderColor: typeInfo.color }}
                         >
-                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                          <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -754,8 +754,8 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* Code Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Code Ops</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">Code Ops</h3>
+                <div className="flex flex-col items-center gap-3">
                   {(['code', 'execute', 'debug', 'fix', 'test'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
                     const Icon = typeInfo.icon;
@@ -768,12 +768,12 @@ I will automatically apply this corrected configuration to the node.`;
                         title={typeInfo.label}
                       >
                         <div
-                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          className="w-16 h-16 rounded shadow-md border-2 bg-white flex items-center justify-center"
                           style={{ borderColor: typeInfo.color }}
                         >
-                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                          <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -784,8 +784,8 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* Flow Control */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Flow</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">Flow</h3>
+                <div className="flex flex-col items-center gap-3">
                   {(['decide', 'loop', 'wait'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
                     const Icon = typeInfo.icon;
@@ -798,12 +798,12 @@ I will automatically apply this corrected configuration to the node.`;
                         title={typeInfo.label}
                       >
                         <div
-                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          className="w-16 h-16 rounded shadow-md border-2 bg-white flex items-center justify-center"
                           style={{ borderColor: typeInfo.color }}
                         >
-                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                          <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -814,8 +814,8 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* Integration */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Integration</h3>
-                <div className="grid grid-cols-3 gap-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">Integration</h3>
+                <div className="flex flex-col items-center gap-3">
                   {(['http', 'passTo', 'compare', 'correct'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
                     const Icon = typeInfo.icon;
@@ -828,12 +828,12 @@ I will automatically apply this corrected configuration to the node.`;
                         title={typeInfo.label}
                       >
                         <div
-                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          className="w-16 h-16 rounded shadow-md border-2 bg-white flex items-center justify-center"
                           style={{ borderColor: typeInfo.color }}
                         >
-                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                          <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -845,7 +845,7 @@ I will automatically apply this corrected configuration to the node.`;
           </div>
 
           {/* Canvas */}
-          <div className="col-span-6 h-full bg-gray-50">
+          <div className="col-span-7 h-full bg-gray-50">
             {activeWorkflow ? (
               <ReactFlow
                 nodes={nodes}
