@@ -11,6 +11,8 @@ import ReactFlow, {
   useEdgesState,
   MarkerType,
   NodeTypes,
+  Handle,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
@@ -63,9 +65,21 @@ function InstructionNode({ data }: { data: any }) {
 
   return (
     <div
-      className="px-4 py-3 shadow-lg rounded-lg border-2 bg-white min-w-[180px]"
+      className="px-4 py-3 shadow-lg rounded-lg border-2 bg-white min-w-[180px] relative"
       style={{ borderColor: typeInfo.color }}
     >
+      {/* Input Handle (left side) */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          width: '12px',
+          height: '12px',
+          backgroundColor: typeInfo.color,
+          border: '2px solid white',
+        }}
+      />
+
       <div className="flex items-center gap-2">
         <div
           className="rounded p-2 flex-shrink-0"
@@ -78,6 +92,18 @@ function InstructionNode({ data }: { data: any }) {
           <div className="text-xs text-gray-500 truncate">{data.label || 'Untitled'}</div>
         </div>
       </div>
+
+      {/* Output Handle (right side) */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          width: '12px',
+          height: '12px',
+          backgroundColor: typeInfo.color,
+          border: '2px solid white',
+        }}
+      />
     </div>
   );
 }
