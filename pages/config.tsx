@@ -281,11 +281,28 @@ export default function ConfigPage() {
               {loadingModels[providerKey] ? 'Fetching Models...' : 'Fetch Latest Models from API'}
             </button>
 
-            {/* Model Selection */}
+            {/* Model Input - Text field to type any model name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Model Name
+              </label>
+              <input
+                type="text"
+                value={provider.model}
+                onChange={(e) => updateProvider(providerKey, { model: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
+                placeholder="e.g., claude-sonnet-4-5, gpt-4o, gemini-2.5-pro"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Type or paste any model name from {info.name}
+              </p>
+            </div>
+
+            {/* Model Selection Dropdown (if models fetched) */}
             {providerModels[providerKey] && providerModels[providerKey].length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Model ({providerModels[providerKey].length} available)
+                  Or select from fetched models ({providerModels[providerKey].length} available)
                 </label>
                 <select
                   value={provider.model}
@@ -299,14 +316,6 @@ export default function ConfigPage() {
                   ))}
                 </select>
                 <p className="text-xs text-green-600 mt-1">✓ Fetched live from {info.name} API</p>
-              </div>
-            )}
-
-            {!providerModels[providerKey] && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-sm text-yellow-800">
-                  <strong>⚠️ No models loaded.</strong> Add your API key above and click "Fetch Latest Models" to see available models directly from {info.name}.
-                </p>
               </div>
             )}
 
