@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Loader, AlertCircle, MessageSquare, Terminal, ChevronDown, ChevronRight } from 'lucide-react';
+import { Send, Loader, AlertCircle, MessageSquare, Terminal, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -28,6 +28,31 @@ export default function ChatPage() {
   const [config, setConfig] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem('powernode-chat-messages');
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages);
+        // Convert timestamp strings back to Date objects
+        const messagesWithDates = parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
+        setMessages(messagesWithDates);
+      } catch (err) {
+        console.error('Failed to load saved messages:', err);
+      }
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('powernode-chat-messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   useEffect(() => {
     // Load config to get selected model
@@ -123,24 +148,42 @@ export default function ChatPage() {
     }
   };
 
+  const clearConversation = () => {
+    if (confirm('Are you sure you want to clear the entire conversation? This cannot be undone.')) {
+      setMessages([]);
+      localStorage.removeItem('powernode-chat-messages');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Chat</h1>
-          <p className="text-gray-600">
-            {config ? (
-              <>
-                Model: <span className="font-mono font-semibold text-primary">
-                  {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
-                </span>
-                {' '} ({config.defaultProvider})
-              </>
-            ) : (
-              'Loading configuration...'
-            )}
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Chat</h1>
+            <p className="text-gray-600">
+              {config ? (
+                <>
+                  Model: <span className="font-mono font-semibold text-primary">
+                    {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
+                  </span>
+                  {' '} ({config.defaultProvider})
+                </>
+              ) : (
+                'Loading configuration...'
+              )}
+            </p>
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={clearConversation}
+              className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear Conversation
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
