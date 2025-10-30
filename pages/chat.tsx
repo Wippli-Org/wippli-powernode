@@ -25,8 +25,17 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(true);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
+  const [config, setConfig] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load config to get selected model
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => setConfig(data))
+      .catch(err => console.error('Failed to load config:', err));
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -121,7 +130,16 @@ export default function ChatPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Chat</h1>
           <p className="text-gray-600">
-            Test your AI configuration with MCP tools - see detailed execution logs in real-time
+            {config ? (
+              <>
+                Model: <span className="font-mono font-semibold text-primary">
+                  {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
+                </span>
+                {' '} ({config.defaultProvider})
+              </>
+            ) : (
+              'Loading configuration...'
+            )}
           </p>
         </div>
 
