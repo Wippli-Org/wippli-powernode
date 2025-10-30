@@ -108,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { role: 'user', content: message + mcpContext }
     ];
 
-    addLog('AI', `${provider} (${providerConfig.model})`, `Processing conversation with ${providerConfig.model}`, {
+    addLog('AI', providerConfig.model, `Processing conversation`, {
       messages: conversationLength,
       temperature: config.temperature || 0.7,
       maxTokens: config.maxTokens || 4096,
@@ -146,7 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Calculate REAL cost
     const cost = ((inputTokens * 3 / 1000000) + (outputTokens * 15 / 1000000)).toFixed(4);
 
-    addLog('SUCCESS', `${provider} (${providerConfig.model})`, `AI response received (${aiDuration}ms)`, {
+    addLog('SUCCESS', providerConfig.model, `AI response received (${aiDuration}ms)`, {
       inputTokens,
       outputTokens,
       totalTokens: inputTokens + outputTokens,

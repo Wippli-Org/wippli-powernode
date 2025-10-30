@@ -278,29 +278,33 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Chat</h1>
-          <p className="text-gray-600">
-            {config ? (
-              <>
-                Model: <span className="font-mono font-semibold text-primary">
-                  {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
-                </span>
-                {' '} ({config.defaultProvider})
-              </>
-            ) : (
-              'Loading configuration...'
-            )}
-          </p>
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-200 bg-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">PowerNode Chat</h1>
+            <p className="text-sm text-gray-600">
+              {config ? (
+                <>
+                  <span className="font-mono font-semibold text-primary">
+                    {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
+                  </span>
+                </>
+              ) : (
+                'Loading configuration...'
+              )}
+            </p>
+          </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-12 gap-6">
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden px-4 sm:px-6 lg:px-8 py-4">
+        <div className="h-full grid grid-cols-12 gap-4">
           {/* Conversations Sidebar */}
-          <div className="col-span-12 lg:col-span-3">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-200px)] flex flex-col">
+          <div className="col-span-12 lg:col-span-3 h-full">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col">
               {/* Sidebar Header */}
               <div className="p-4 border-b border-gray-200">
                 <button
@@ -391,9 +395,9 @@ export default function ChatPage() {
           </div>
 
           {/* Main Content Area */}
-          <div className="col-span-12 lg:col-span-9 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Chat Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
@@ -421,7 +425,7 @@ export default function ChatPage() {
                         : 'bg-gray-100 text-gray-900'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                     <p className="text-xs mt-1 opacity-70">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
@@ -471,7 +475,7 @@ export default function ChatPage() {
           </div>
 
           {/* Execution Logs Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full">
             {/* Logs Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
