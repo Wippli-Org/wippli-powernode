@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Loader, AlertCircle, MessageSquare, Terminal, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { Send, Loader, AlertCircle, MessageSquare, Terminal, ChevronDown, ChevronRight, Trash2, Plus, Edit2, Check, X } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -18,7 +18,17 @@ interface LogEntry {
   expanded?: boolean;
 }
 
+interface Conversation {
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  messages: Message[];
+}
+
 export default function ChatPage() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,33 +36,85 @@ export default function ChatPage() {
   const [showLogs, setShowLogs] = useState(true);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [config, setConfig] = useState<any>(null);
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Load messages from localStorage on mount
+  // Get wippli_ID from localStorage or use 'default'
+  const getWippliId = () => {
+    return localStorage.getItem('wippli_id') || 'default';
+  };
+
+  const getStorageKey = (key: string) => {
+    return `powernode-${getWippliId()}-${key}`;
+  };
+
+  // Load conversations from localStorage on mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem('powernode-chat-messages');
-    if (savedMessages) {
+    const savedConversations = localStorage.getItem(getStorageKey('conversations'));
+    const savedActiveId = localStorage.getItem(getStorageKey('active-conversation'));
+
+    if (savedConversations) {
       try {
-        const parsed = JSON.parse(savedMessages);
+        const parsed = JSON.parse(savedConversations);
         // Convert timestamp strings back to Date objects
-        const messagesWithDates = parsed.map((m: any) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
+        const conversationsWithDates = parsed.map((conv: any) => ({
+          ...conv,
+          createdAt: new Date(conv.createdAt),
+          updatedAt: new Date(conv.updatedAt),
+          messages: conv.messages.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp),
+          })),
         }));
-        setMessages(messagesWithDates);
+        setConversations(conversationsWithDates);
+
+        // Load active conversation
+        if (savedActiveId && conversationsWithDates.find((c: Conversation) => c.id === savedActiveId)) {
+          setActiveConversationId(savedActiveId);
+          const activeConv = conversationsWithDates.find((c: Conversation) => c.id === savedActiveId);
+          if (activeConv) {
+            setMessages(activeConv.messages);
+          }
+        } else if (conversationsWithDates.length > 0) {
+          // Default to first conversation
+          setActiveConversationId(conversationsWithDates[0].id);
+          setMessages(conversationsWithDates[0].messages);
+        }
       } catch (err) {
-        console.error('Failed to load saved messages:', err);
+        console.error('Failed to load saved conversations:', err);
       }
+    } else {
+      // Create first conversation if none exist
+      createNewConversation();
     }
   }, []);
 
-  // Save messages to localStorage whenever they change
+  // Save conversations to localStorage whenever they change
   useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('powernode-chat-messages', JSON.stringify(messages));
+    if (conversations.length > 0) {
+      localStorage.setItem(getStorageKey('conversations'), JSON.stringify(conversations));
     }
-  }, [messages]);
+  }, [conversations]);
+
+  // Save active conversation ID
+  useEffect(() => {
+    if (activeConversationId) {
+      localStorage.setItem(getStorageKey('active-conversation'), activeConversationId);
+    }
+  }, [activeConversationId]);
+
+  // Update messages in active conversation
+  useEffect(() => {
+    if (activeConversationId && messages.length > 0) {
+      setConversations(prev => prev.map(conv =>
+        conv.id === activeConversationId
+          ? { ...conv, messages, updatedAt: new Date() }
+          : conv
+      ));
+    }
+  }, [messages, activeConversationId]);
 
   useEffect(() => {
     // Load config to get selected model
@@ -148,45 +210,188 @@ export default function ChatPage() {
     }
   };
 
-  const clearConversation = () => {
-    if (confirm('Are you sure you want to clear the entire conversation? This cannot be undone.')) {
-      setMessages([]);
-      localStorage.removeItem('powernode-chat-messages');
+  const createNewConversation = () => {
+    const newConv: Conversation = {
+      id: Date.now().toString(),
+      name: `Conversation ${conversations.length + 1}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      messages: [],
+    };
+    setConversations([newConv, ...conversations]);
+    setActiveConversationId(newConv.id);
+    setMessages([]);
+  };
+
+  const switchConversation = (convId: string) => {
+    const conv = conversations.find(c => c.id === convId);
+    if (conv) {
+      setActiveConversationId(convId);
+      setMessages(conv.messages);
+    }
+  };
+
+  const startRenameConversation = (convId: string, currentName: string) => {
+    setEditingConversationId(convId);
+    setEditingName(currentName);
+  };
+
+  const saveConversationName = () => {
+    if (editingConversationId && editingName.trim()) {
+      setConversations(prev => prev.map(conv =>
+        conv.id === editingConversationId
+          ? { ...conv, name: editingName.trim() }
+          : conv
+      ));
+    }
+    setEditingConversationId(null);
+    setEditingName('');
+  };
+
+  const cancelRename = () => {
+    setEditingConversationId(null);
+    setEditingName('');
+  };
+
+  const deleteConversation = (convId: string) => {
+    if (confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
+      const newConversations = conversations.filter(c => c.id !== convId);
+      setConversations(newConversations);
+
+      // If deleting active conversation, switch to first available
+      if (convId === activeConversationId) {
+        if (newConversations.length > 0) {
+          setActiveConversationId(newConversations[0].id);
+          setMessages(newConversations[0].messages);
+        } else {
+          // Create new conversation if none left
+          createNewConversation();
+        }
+      }
+
+      // Clean up localStorage if no conversations left
+      if (newConversations.length === 0) {
+        localStorage.removeItem(getStorageKey('conversations'));
+        localStorage.removeItem(getStorageKey('active-conversation'));
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Chat</h1>
-            <p className="text-gray-600">
-              {config ? (
-                <>
-                  Model: <span className="font-mono font-semibold text-primary">
-                    {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
-                  </span>
-                  {' '} ({config.defaultProvider})
-                </>
-              ) : (
-                'Loading configuration...'
-              )}
-            </p>
-          </div>
-          {messages.length > 0 && (
-            <button
-              onClick={clearConversation}
-              className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear Conversation
-            </button>
-          )}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Chat</h1>
+          <p className="text-gray-600">
+            {config ? (
+              <>
+                Model: <span className="font-mono font-semibold text-primary">
+                  {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
+                </span>
+                {' '} ({config.defaultProvider})
+              </>
+            ) : (
+              'Loading configuration...'
+            )}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-12 gap-6">
+          {/* Conversations Sidebar */}
+          <div className="col-span-12 lg:col-span-3">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-200px)] flex flex-col">
+              {/* Sidebar Header */}
+              <div className="p-4 border-b border-gray-200">
+                <button
+                  onClick={createNewConversation}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Conversation
+                </button>
+              </div>
+
+              {/* Conversations List */}
+              <div className="flex-1 overflow-y-auto p-2">
+                {conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={`group mb-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      conv.id === activeConversationId
+                        ? 'bg-primary/10 border-primary'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => switchConversation(conv.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      {editingConversationId === conv.id ? (
+                        <div className="flex-1 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') saveConversationName();
+                              if (e.key === 'Escape') cancelRename();
+                            }}
+                            className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent"
+                            autoFocus
+                          />
+                          <button
+                            onClick={saveConversationName}
+                            className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={cancelRename}
+                            className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-gray-900 truncate">
+                              {conv.name}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              {conv.messages.length} messages
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startRenameConversation(conv.id, conv.name);
+                              }}
+                              className="p-1 text-gray-600 hover:bg-gray-200 rounded"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteConversation(conv.id);
+                              }}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="col-span-12 lg:col-span-9 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Chat Panel */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-[calc(100vh-200px)]">
             {/* Chat Header */}
@@ -333,6 +538,7 @@ export default function ChatPage() {
                 <div ref={logsEndRef} />
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>
