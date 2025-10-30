@@ -34,32 +34,22 @@ const providerInfo = {
   openai: {
     name: 'OpenAI',
     getKeyUrl: 'https://platform.openai.com/api-keys',
-    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-    defaultModel: 'gpt-4o',
   },
   anthropic: {
     name: 'Anthropic',
     getKeyUrl: 'https://console.anthropic.com/settings/keys',
-    models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
-    defaultModel: 'claude-3-5-sonnet-20241022',
   },
   google: {
     name: 'Google AI',
     getKeyUrl: 'https://aistudio.google.com/app/apikey',
-    models: ['gemini-2.0-flash-exp', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'],
-    defaultModel: 'gemini-2.0-flash-exp',
   },
   mistral: {
     name: 'Mistral AI',
     getKeyUrl: 'https://console.mistral.ai/api-keys/',
-    models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'],
-    defaultModel: 'mistral-large-latest',
   },
   azureOpenAI: {
     name: 'Azure OpenAI',
     getKeyUrl: 'https://portal.azure.com',
-    models: ['gpt-4o', 'gpt-4-turbo', 'gpt-35-turbo'],
-    defaultModel: 'gpt-4o',
   },
 };
 
@@ -84,6 +74,10 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Dynamic models state
+  const [providerModels, setProviderModels] = useState<Record<string, any[]>>({});
+  const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadConfig();
@@ -138,6 +132,37 @@ export default function ConfigPage() {
         [provider]: { ...config.providers[provider], ...updates },
       },
     });
+  };
+
+  const fetchProviderModels = async (provider: keyof typeof config.providers) => {
+    const providerConfig = config.providers[provider];
+    if (!providerConfig || !providerConfig.apiKey) {
+      return;
+    }
+
+    setLoadingModels({ ...loadingModels, [provider]: true });
+
+    try {
+      let url = `/api/models/${provider}?apiKey=${encodeURIComponent(providerConfig.apiKey)}`;
+
+      // Azure needs endpoint too
+      if (provider === 'azureOpenAI' && (providerConfig as any).endpoint) {
+        url += `&endpoint=${encodeURIComponent((providerConfig as any).endpoint)}`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.models) {
+        setProviderModels({ ...providerModels, [provider]: data.models });
+      } else if (data.fallback) {
+        setProviderModels({ ...providerModels, [provider]: data.fallback });
+      }
+    } catch (error) {
+      console.error(`Failed to fetch ${provider} models:`, error);
+    } finally {
+      setLoadingModels({ ...loadingModels, [provider]: false });
+    }
   };
 
   const renderSecretInput = (label: string, value: string, onChange: (val: string) => void, key: string) => (
@@ -246,21 +271,44 @@ export default function ConfigPage() {
               </>
             )}
 
+            {/* Fetch Models Button */}
+            <button
+              onClick={() => fetchProviderModels(providerKey)}
+              disabled={!provider.apiKey || loadingModels[providerKey]}
+              className="w-full px-4 py-2 border border-primary text-primary rounded-lg font-medium hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingModels[providerKey] ? 'animate-spin' : ''}`} />
+              {loadingModels[providerKey] ? 'Fetching Models...' : 'Fetch Latest Models from API'}
+            </button>
+
             {/* Model Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
-              <select
-                value={provider.model}
-                onChange={(e) => updateProvider(providerKey, { model: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                {info.models.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {providerModels[providerKey] && providerModels[providerKey].length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Model ({providerModels[providerKey].length} available)
+                </label>
+                <select
+                  value={provider.model}
+                  onChange={(e) => updateProvider(providerKey, { model: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  {providerModels[providerKey].map((model: any) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name || model.id}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-green-600 mt-1">✓ Fetched live from {info.name} API</p>
+              </div>
+            )}
+
+            {!providerModels[providerKey] && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">
+                  <strong>⚠️ No models loaded.</strong> Add your API key above and click "Fetch Latest Models" to see available models directly from {info.name}.
+                </p>
+              </div>
+            )}
 
             {/* Set as Default */}
             <button
