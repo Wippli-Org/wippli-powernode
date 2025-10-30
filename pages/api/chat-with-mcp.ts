@@ -75,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const provider = config.defaultProvider || 'anthropic';
-    const providerConfig = config.providers?.[provider];
+    const providerConfig = config.providers?.[provider as keyof typeof config.providers];
 
     if (!providerConfig || !providerConfig.enabled || !providerConfig.apiKey) {
       throw new Error('Please configure and enable a default AI provider first');
