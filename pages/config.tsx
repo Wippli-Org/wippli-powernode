@@ -1,33 +1,13 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 
 interface PowerNodeConfig {
-  // AI Provider Configuration
-  aiProvider: 'azure' | 'anthropic' | 'mistral';
-
-  // Azure OpenAI
-  azureOpenAIEndpoint: string;
-  azureOpenAIKey: string;
-  azureOpenAIDeployment: string;
-  azureOpenAIEmbeddingDeployment: string;
-  azureOpenAIApiVersion: string;
-
-  // Anthropic Claude
-  anthropicApiKey: string;
-
-  // Mistral
-  mistralApiKey: string;
-
-  // Storage Configuration
+  openRouterApiKey: string;
   powerNodeStorageConnection: string;
   azureStorageAccount: string;
-
-  // AI Configuration
   defaultModel: string;
   temperature: number;
   maxTokens: number;
-
-  // MCP Tool Custom Prompts
   customPrompts: {
     downloadWippliFile?: string;
     queryVectorDatabase?: string;
@@ -37,24 +17,29 @@ interface PowerNodeConfig {
   };
 }
 
+interface OpenRouterModel {
+  id: string;
+  name: string;
+  pricing: {
+    prompt: string;
+    completion: string;
+  };
+  context_length: number;
+}
+
 export default function ConfigPage() {
   const [config, setConfig] = useState<PowerNodeConfig>({
-    aiProvider: 'azure',
-    azureOpenAIEndpoint: '',
-    azureOpenAIKey: '',
-    azureOpenAIDeployment: 'gpt-4o-powerdocs',
-    azureOpenAIEmbeddingDeployment: 'text-embedding-3-large',
-    azureOpenAIApiVersion: '2024-08-01-preview',
-    anthropicApiKey: '',
-    mistralApiKey: '',
+    openRouterApiKey: '',
     powerNodeStorageConnection: '',
     azureStorageAccount: 'powernodeexecutions',
-    defaultModel: 'gpt-4o',
+    defaultModel: 'openai/gpt-4o',
     temperature: 0.7,
     maxTokens: 4096,
     customPrompts: {},
   });
 
+  const [models, setModels] = useState<OpenRouterModel[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -62,6 +47,7 @@ export default function ConfigPage() {
 
   useEffect(() => {
     loadConfig();
+    fetchModels();
   }, []);
 
   const loadConfig = async () => {
@@ -73,6 +59,21 @@ export default function ConfigPage() {
       }
     } catch (err) {
       console.error('Failed to load config:', err);
+    }
+  };
+
+  const fetchModels = async () => {
+    setLoadingModels(true);
+    try {
+      const response = await fetch('/api/openrouter-models');
+      if (response.ok) {
+        const data = await response.json();
+        setModels(data.models || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch models:', err);
+    } finally {
+      setLoadingModels(false);
     }
   };
 
@@ -134,7 +135,7 @@ export default function ConfigPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Configuration</h1>
           <p className="text-gray-600">
-            Configure AI providers, storage, and custom prompts for MCP tools
+            Configure OpenRouter for unified AI access - one API key for all models
           </p>
         </div>
 
@@ -156,259 +157,123 @@ export default function ConfigPage() {
           </div>
         )}
 
-        {/* AI Provider Selection */}
+        {/* OpenRouter Configuration */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">AI Provider</h2>
-          <div className="grid grid-cols-3 gap-4">
-            {(['azure', 'anthropic', 'mistral'] as const).map((provider) => (
-              <button
-                key={provider}
-                onClick={() => setConfig({ ...config, aiProvider: provider })}
-                className={`p-4 border-2 rounded-lg text-center transition-colors ${
-                  config.aiProvider === provider
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                }`}
-              >
-                <div className="font-semibold capitalize">{provider}</div>
-                <div className="text-xs mt-1 opacity-70">
-                  {provider === 'azure' && 'GPT-4o, GPT-4 Turbo'}
-                  {provider === 'anthropic' && 'Claude Sonnet 3.5'}
-                  {provider === 'mistral' && 'Mistral Large 2'}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">OpenRouter API</h2>
+            <a
+              href="https://openrouter.ai/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              Get API Key <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-blue-800">
+              <strong>Why OpenRouter?</strong> Access GPT-4o, Claude 3.5 Sonnet, Gemini, Llama, Mistral, and 200+ models with one API key.
+              Always up-to-date with the latest models - no hard-coded lists!
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {renderSecretInput(
+              'OpenRouter API Key',
+              config.openRouterApiKey,
+              (val) => setConfig({ ...config, openRouterApiKey: val }),
+              'openRouterApiKey'
+            )}
+
+            {/* AI Model Configuration */}
+            <div className="pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">Model</label>
+                    <button
+                      onClick={fetchModels}
+                      disabled={loadingModels}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${loadingModels ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </button>
+                  </div>
+                  <select
+                    value={config.defaultModel}
+                    onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    disabled={loadingModels}
+                  >
+                    {loadingModels ? (
+                      <option>Loading models...</option>
+                    ) : models.length === 0 ? (
+                      <>
+                        <option value="openai/gpt-4o">OpenAI: GPT-4o</option>
+                        <option value="anthropic/claude-3.5-sonnet">Anthropic: Claude 3.5 Sonnet</option>
+                        <option value="google/gemini-pro-1.5">Google: Gemini Pro 1.5</option>
+                        <option value="meta-llama/llama-3.1-70b-instruct">Meta: Llama 3.1 70B</option>
+                        <option value="mistralai/mistral-large">Mistral: Large</option>
+                      </>
+                    ) : (
+                      <>
+                        <optgroup label="Popular Models">
+                          {models.slice(0, 20).map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {models.length > 20 && (
+                          <optgroup label="All Models">
+                            {models.slice(20).map((model) => (
+                              <option key={model.id} value={model.id}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </>
+                    )}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {models.length > 0 ? `${models.length} models available` : 'Using default models'}
+                  </p>
                 </div>
-              </button>
-            ))}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={config.temperature}
+                    onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">0 = deterministic, 2 = creative</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                  <input
+                    type="number"
+                    min="100"
+                    max="200000"
+                    step="100"
+                    value={config.maxTokens}
+                    onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Azure OpenAI Configuration */}
-        {config.aiProvider === 'azure' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Azure OpenAI Configuration</h2>
-            <div className="grid grid-cols-1 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Endpoint</label>
-                <input
-                  type="text"
-                  value={config.azureOpenAIEndpoint}
-                  onChange={(e) => setConfig({ ...config, azureOpenAIEndpoint: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="https://australiaeast.api.cognitive.microsoft.com/"
-                />
-              </div>
-              {renderSecretInput(
-                'API Key',
-                config.azureOpenAIKey,
-                (val) => setConfig({ ...config, azureOpenAIKey: val }),
-                'azureOpenAIKey'
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Deployment Name</label>
-                <input
-                  type="text"
-                  value={config.azureOpenAIDeployment}
-                  onChange={(e) => setConfig({ ...config, azureOpenAIDeployment: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="gpt-4o-powerdocs"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Embedding Deployment
-                </label>
-                <input
-                  type="text"
-                  value={config.azureOpenAIEmbeddingDeployment}
-                  onChange={(e) => setConfig({ ...config, azureOpenAIEmbeddingDeployment: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="text-embedding-3-large"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">API Version</label>
-                <input
-                  type="text"
-                  value={config.azureOpenAIApiVersion}
-                  onChange={(e) => setConfig({ ...config, azureOpenAIApiVersion: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="2024-08-01-preview"
-                />
-              </div>
-
-              {/* AI Model Configuration for Azure */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={config.temperature}
-                      onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">0 = deterministic, 2 = creative</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
-                    <input
-                      type="number"
-                      min="100"
-                      max="200000"
-                      step="100"
-                      value={config.maxTokens}
-                      onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
-                    <select
-                      value={config.defaultModel}
-                      onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="gpt-4o">GPT-4o</option>
-                      <option value="gpt-4o-mini">GPT-4o mini</option>
-                      <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                      <option value="gpt-4">GPT-4</option>
-                      <option value="o1-preview">O1 Preview</option>
-                      <option value="o1-mini">O1 mini</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Anthropic Configuration */}
-        {config.aiProvider === 'anthropic' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Anthropic Claude Configuration</h2>
-            <div className="grid grid-cols-1 gap-6">
-              {renderSecretInput(
-                'Anthropic API Key',
-                config.anthropicApiKey,
-                (val) => setConfig({ ...config, anthropicApiKey: val }),
-                'anthropicApiKey'
-              )}
-
-              {/* AI Model Configuration for Anthropic */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={config.temperature}
-                      onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">0 = deterministic, 1 = creative</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
-                    <input
-                      type="number"
-                      min="100"
-                      max="200000"
-                      step="100"
-                      value={config.maxTokens}
-                      onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
-                    <select
-                      value={config.defaultModel}
-                      onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Oct 2024)</option>
-                      <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (June 2024)</option>
-                      <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                      <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                      <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                      <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Mistral Configuration */}
-        {config.aiProvider === 'mistral' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Mistral AI Configuration</h2>
-            <div className="grid grid-cols-1 gap-6">
-              {renderSecretInput(
-                'Mistral API Key',
-                config.mistralApiKey,
-                (val) => setConfig({ ...config, mistralApiKey: val }),
-                'mistralApiKey'
-              )}
-
-              {/* AI Model Configuration for Mistral */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={config.temperature}
-                      onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">0 = deterministic, 1 = creative</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
-                    <input
-                      type="number"
-                      min="100"
-                      max="200000"
-                      step="100"
-                      value={config.maxTokens}
-                      onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
-                    <select
-                      value={config.defaultModel}
-                      onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="mistral-large-latest">Mistral Large (Latest)</option>
-                      <option value="mistral-large-2411">Mistral Large 2 (Nov 2024)</option>
-                      <option value="mistral-large-2407">Mistral Large 2 (July 2024)</option>
-                      <option value="mistral-small-latest">Mistral Small (Latest)</option>
-                      <option value="codestral-latest">Codestral (Latest)</option>
-                      <option value="ministral-8b-latest">Ministral 8B</option>
-                      <option value="ministral-3b-latest">Ministral 3B</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Storage Configuration */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
