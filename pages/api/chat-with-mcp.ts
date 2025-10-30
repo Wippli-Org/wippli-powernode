@@ -97,33 +97,72 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // Load configuration to get API key and model
+    const configResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/config`);
+    const config = await configResponse.json();
+
+    const provider = config.defaultProvider || 'anthropic';
+    const providerConfig = config.providers?.[provider];
+
+    if (!providerConfig || !providerConfig.enabled || !providerConfig.apiKey) {
+      throw new Error('Please configure and enable a default AI provider first');
+    }
+
     // Call AI
-    addLog('INFO', 'AI Provider', 'Preparing AI request...');
+    addLog('INFO', 'AI Provider', `Using ${provider} provider`);
 
     const conversationLength = (conversationHistory?.length || 0) + 1;
-    const tokenEstimate = message.length * 0.75; // Rough estimate
+    const messages = [
+      ...(conversationHistory || []),
+      { role: 'user', content: message }
+    ];
 
-    addLog('AI', 'Anthropic Claude', `Processing conversation with claude-sonnet-4-5`, {
+    addLog('AI', `${provider} (${providerConfig.model})`, `Processing conversation with ${providerConfig.model}`, {
       messages: conversationLength,
-      estimatedTokens: Math.round(tokenEstimate),
-      temperature: 0.7,
+      temperature: config.temperature || 0.7,
+      maxTokens: config.maxTokens || 4096,
     });
 
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Make real API call to Claude
+    const aiStartTime = Date.now();
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': providerConfig.apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: providerConfig.model,
+        max_tokens: config.maxTokens || 4096,
+        temperature: config.temperature || 0.7,
+        messages: messages,
+      }),
+    });
 
-    const inputTokens = Math.round(tokenEstimate);
-    const outputTokens = Math.round(Math.random() * 200 + 50);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const reply = data.content[0].text;
+    const inputTokens = data.usage.input_tokens;
+    const outputTokens = data.usage.output_tokens;
+    const aiDuration = Date.now() - aiStartTime;
+
+    // Calculate cost (Anthropic pricing for Claude Sonnet 4.5)
     const cost = ((inputTokens * 3 / 1000000) + (outputTokens * 15 / 1000000)).toFixed(4);
 
-    addLog('SUCCESS', 'Anthropic Claude', `AI response received (${Date.now() - startTime}ms)`, {
+    addLog('SUCCESS', `${provider} (${providerConfig.model})`, `AI response received (${aiDuration}ms)`, {
       inputTokens,
       outputTokens,
       totalTokens: inputTokens + outputTokens,
       cost: `$${cost}`,
+      stopReason: data.stop_reason,
     });
 
-    // Check rate limits
+    // Check rate limits (simulated for now)
     const requestCount = Math.floor(Math.random() * 30 + 50);
     if (requestCount > 70) {
       addLog('WARN', 'Rate Limiter', `Rate limit threshold approaching (${requestCount}/100 requests in window)`, {
@@ -133,17 +172,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else {
       addLog('INFO', 'Rate Limiter', `Rate limits: ${requestCount}/100 requests used`);
     }
-
-    addLog('INFO', 'Response Builder', 'Formatting response...');
-
-    // Generate response
-    const reply = `I received your message: "${message}"\n\n` +
-                 `This is a response from Claude Sonnet 4.5 via PowerNode MCP.\n\n` +
-                 (requiresMCP ?
-                   `I've accessed the Wippli context and found 7 related files. ` +
-                   `The task "Test Rag Retrieval" is currently In Progress.\n\n` : '') +
-                 `The conversation has ${conversationLength} messages. ` +
-                 `Processing took ${Date.now() - startTime}ms with ${inputTokens + outputTokens} tokens used.`;
 
     addLog('SUCCESS', 'PowerNode Chat', `Response ready (${Date.now() - startTime}ms total)`);
 
