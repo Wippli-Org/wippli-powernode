@@ -508,13 +508,14 @@ export default function ChatPage() {
                     return (
                       <div
                         key={logId}
-                        className={`border rounded p-2 ${getLevelColor(log.level)}`}
+                        className={`border rounded p-3 ${getLevelColor(log.level)}`}
                       >
-                        <div className="flex items-start gap-2">
-                          <span className="text-gray-500 flex-shrink-0">{log.timestamp}</span>
-                          <span className="font-semibold flex-shrink-0">{log.level}</span>
-                          <span className="text-gray-700 flex-shrink-0">{log.component}</span>
-                          <p className="flex-1">{log.message}</p>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-gray-500">{log.timestamp}</span>
+                            <span className="font-semibold">{log.level}</span>
+                            <span className="text-gray-700">{log.component}</span>
+                          </div>
                           {log.details && (
                             <button
                               onClick={() => toggleLogExpanded(logId)}
@@ -528,6 +529,7 @@ export default function ChatPage() {
                             </button>
                           )}
                         </div>
+                        <p className="text-sm pl-0">{log.message}</p>
 
                         {isExpanded && log.details && (
                           <div className="mt-2 p-2 bg-black/5 rounded text-xs overflow-x-auto">
