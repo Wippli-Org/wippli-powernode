@@ -234,6 +234,53 @@ export default function ConfigPage() {
                   placeholder="2024-08-01-preview"
                 />
               </div>
+
+              {/* AI Model Configuration for Azure */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={config.temperature}
+                      onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0 = deterministic, 2 = creative</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                    <input
+                      type="number"
+                      min="100"
+                      max="200000"
+                      step="100"
+                      value={config.maxTokens}
+                      onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
+                    <select
+                      value={config.defaultModel}
+                      onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="gpt-4o">GPT-4o</option>
+                      <option value="gpt-4o-mini">GPT-4o mini</option>
+                      <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                      <option value="gpt-4">GPT-4</option>
+                      <option value="o1-preview">O1 Preview</option>
+                      <option value="o1-mini">O1 mini</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -242,12 +289,61 @@ export default function ConfigPage() {
         {config.aiProvider === 'anthropic' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Anthropic Claude Configuration</h2>
-            {renderSecretInput(
-              'Anthropic API Key',
-              config.anthropicApiKey,
-              (val) => setConfig({ ...config, anthropicApiKey: val }),
-              'anthropicApiKey'
-            )}
+            <div className="grid grid-cols-1 gap-6">
+              {renderSecretInput(
+                'Anthropic API Key',
+                config.anthropicApiKey,
+                (val) => setConfig({ ...config, anthropicApiKey: val }),
+                'anthropicApiKey'
+              )}
+
+              {/* AI Model Configuration for Anthropic */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={config.temperature}
+                      onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0 = deterministic, 1 = creative</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                    <input
+                      type="number"
+                      min="100"
+                      max="200000"
+                      step="100"
+                      value={config.maxTokens}
+                      onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
+                    <select
+                      value={config.defaultModel}
+                      onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Oct 2024)</option>
+                      <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet (June 2024)</option>
+                      <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                      <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                      <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                      <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -255,12 +351,62 @@ export default function ConfigPage() {
         {config.aiProvider === 'mistral' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Mistral AI Configuration</h2>
-            {renderSecretInput(
-              'Mistral API Key',
-              config.mistralApiKey,
-              (val) => setConfig({ ...config, mistralApiKey: val }),
-              'mistralApiKey'
-            )}
+            <div className="grid grid-cols-1 gap-6">
+              {renderSecretInput(
+                'Mistral API Key',
+                config.mistralApiKey,
+                (val) => setConfig({ ...config, mistralApiKey: val }),
+                'mistralApiKey'
+              )}
+
+              {/* AI Model Configuration for Mistral */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={config.temperature}
+                      onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0 = deterministic, 1 = creative</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                    <input
+                      type="number"
+                      min="100"
+                      max="200000"
+                      step="100"
+                      value={config.maxTokens}
+                      onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
+                    <select
+                      value={config.defaultModel}
+                      onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="mistral-large-latest">Mistral Large (Latest)</option>
+                      <option value="mistral-large-2411">Mistral Large 2 (Nov 2024)</option>
+                      <option value="mistral-large-2407">Mistral Large 2 (July 2024)</option>
+                      <option value="mistral-small-latest">Mistral Small (Latest)</option>
+                      <option value="codestral-latest">Codestral (Latest)</option>
+                      <option value="ministral-8b-latest">Ministral 8B</option>
+                      <option value="ministral-3b-latest">Ministral 3B</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -283,51 +429,6 @@ export default function ConfigPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="powernodeexecutions"
               />
-            </div>
-          </div>
-        </div>
-
-        {/* AI Model Configuration */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">AI Model Configuration</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
-              <input
-                type="number"
-                min="0"
-                max="2"
-                step="0.1"
-                value={config.temperature}
-                onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">0 = deterministic, 2 = creative</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
-              <input
-                type="number"
-                min="100"
-                max="200000"
-                step="100"
-                value={config.maxTokens}
-                onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Default Model</label>
-              <select
-                value={config.defaultModel}
-                onChange={(e) => setConfig({ ...config, defaultModel: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
-                <option value="mistral-large-2">Mistral Large 2</option>
-              </select>
             </div>
           </div>
         </div>
