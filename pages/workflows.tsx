@@ -58,6 +58,20 @@ const INSTRUCTION_TYPES = {
 
 type InstructionType = keyof typeof INSTRUCTION_TYPES;
 
+// Available MCP Servers
+const MCP_SERVERS = [
+  { id: 'filesystem', name: 'File System MCP', description: 'Local file operations' },
+  { id: 'msword', name: 'MS Word MCP', description: 'Microsoft Word documents' },
+  { id: 'excel', name: 'MS Excel MCP', description: 'Microsoft Excel spreadsheets' },
+  { id: 'powerpoint', name: 'MS PowerPoint MCP', description: 'Microsoft PowerPoint presentations' },
+  { id: 'pdf', name: 'PDF MCP', description: 'PDF document operations' },
+  { id: 'web', name: 'Web MCP', description: 'Web scraping and browser automation' },
+  { id: 'database', name: 'Database MCP', description: 'Database operations' },
+  { id: 'api', name: 'API MCP', description: 'REST API interactions' },
+  { id: 'email', name: 'Email MCP', description: 'Email operations' },
+  { id: 'azure', name: 'Azure MCP', description: 'Azure cloud services' },
+];
+
 // Custom Node Component
 function InstructionNode({ data }: { data: any }) {
   const typeInfo = INSTRUCTION_TYPES[data.type as InstructionType];
@@ -409,7 +423,7 @@ Please analyze this node and provide:
         // Parse AI response and add to logs
         const aiResponse = result.message;
         const lines = aiResponse.split('\n').slice(0, 5); // First 5 lines
-        lines.forEach(line => {
+        lines.forEach((line: string) => {
           if (line.trim()) {
             addLogToNode(node.id, line.trim());
           }
@@ -807,6 +821,39 @@ Please analyze this node and provide:
                         placeholder="Node label"
                       />
                     </div>
+
+                    {/* MCP Server Selection */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        MCP Server
+                      </label>
+                      <select
+                        value={selectedNode.data.mcpServer || ''}
+                        onChange={(e) => {
+                          setNodes((nds) =>
+                            nds.map((n) =>
+                              n.id === selectedNode.id
+                                ? { ...n, data: { ...n.data, mcpServer: e.target.value } }
+                                : n
+                            )
+                          );
+                        }}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                      >
+                        <option value="">Select MCP Server...</option>
+                        {MCP_SERVERS.map((server) => (
+                          <option key={server.id} value={server.id}>
+                            {server.name}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedNode.data.mcpServer && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {MCP_SERVERS.find(s => s.id === selectedNode.data.mcpServer)?.description}
+                        </p>
+                      )}
+                    </div>
+
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Configuration (JSON)
