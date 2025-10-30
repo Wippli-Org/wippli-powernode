@@ -300,11 +300,11 @@ export default function ChatPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden px-4 sm:px-6 lg:px-8 py-4">
-        <div className="h-full grid grid-cols-12 gap-4">
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full grid grid-cols-12 gap-0">
           {/* Conversations Sidebar */}
-          <div className="col-span-12 lg:col-span-3 h-full">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col">
+          <div className="col-span-12 lg:col-span-3 h-full border-r border-gray-200">
+            <div className="bg-white h-full flex flex-col">
               {/* Sidebar Header */}
               <div className="p-4 border-b border-gray-200">
                 <button
@@ -395,9 +395,9 @@ export default function ChatPage() {
           </div>
 
           {/* Main Content Area */}
-          <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-0">
           {/* Chat Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full">
+          <div className="bg-white border-r border-gray-200 flex flex-col h-full">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
@@ -475,7 +475,7 @@ export default function ChatPage() {
           </div>
 
           {/* Execution Logs Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full">
+          <div className="bg-white flex flex-col h-full">
             {/* Logs Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
