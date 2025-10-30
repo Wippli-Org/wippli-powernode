@@ -1,4 +1,4 @@
-import { Activity, FileText, Zap, Settings } from 'lucide-react';
+import { Activity, FileText, Zap, Settings, ScrollText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -39,20 +39,39 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Configuration Link */}
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Configure PowerNode</h2>
-          <p className="text-gray-600 mb-6">
-            Set up AI providers, storage, and custom prompts for your MCP tools
-          </p>
+        {/* Quick Links */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* Configuration Link */}
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Configure PowerNode</h2>
+            <p className="text-gray-600 mb-6">
+              Set up AI providers, storage, and custom prompts for your MCP tools
+            </p>
 
-          <Link
-            href="/config"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-secondary text-white rounded-lg font-semibold hover:bg-secondary/90 transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-            Open Configuration
-          </Link>
+            <Link
+              href="/config"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-secondary text-white rounded-lg font-semibold hover:bg-secondary/90 transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+              Open Configuration
+            </Link>
+          </div>
+
+          {/* Live Logs Link */}
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Live Logs</h2>
+            <p className="text-gray-600 mb-6">
+              Watch real-time execution logs with filtering, search, and export
+            </p>
+
+            <Link
+              href="/logs"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+            >
+              <ScrollText className="w-5 h-5" />
+              View Live Logs
+            </Link>
+          </div>
         </div>
 
         {/* Demo Link */}
