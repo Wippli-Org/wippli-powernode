@@ -1,4 +1,4 @@
-import { Activity, FileText, Zap, Settings, ScrollText, MessageSquare } from 'lucide-react';
+import { Activity, FileText, Zap, Settings, ScrollText, MessageSquare, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -40,7 +40,23 @@ export default function HomePage() {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Workflow Builder Link */}
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Workflow Builder</h2>
+            <p className="text-gray-600 mb-6">
+              Build AI workflows with MCP instructions - faster and cheaper than chat
+            </p>
+
+            <Link
+              href="/workflows"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+            >
+              <GitBranch className="w-5 h-5" />
+              Open Builder
+            </Link>
+          </div>
+
           {/* Chat Link */}
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Test Chat</h2>
