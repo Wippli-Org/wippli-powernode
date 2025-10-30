@@ -130,7 +130,7 @@ export default function ConfigPage() {
     setShowSecrets({ ...showSecrets, [key]: !showSecrets[key] });
   };
 
-  const updateProvider = (provider: keyof typeof config.providers, updates: Partial<AIProvider>) => {
+  const updateProvider = (provider: keyof typeof config.providers, updates: any) => {
     setConfig({
       ...config,
       providers: {
