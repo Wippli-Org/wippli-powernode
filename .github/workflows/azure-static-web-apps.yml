@@ -46,7 +46,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "/" # App source code path
-          api_location: "pages/api" # API routes location
+          api_location: "" # Empty for Next.js API Routes
           output_location: ".next" # Built app content directory
           skip_app_build: true # We already built it
 
