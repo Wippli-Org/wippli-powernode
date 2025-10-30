@@ -40,11 +40,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     addLog('INFO', 'PowerNode Chat', `Received message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
 
-    // Load REAL configuration
+    // Load REAL configuration (server-side, direct access)
     addLog('INFO', 'Config Loader', 'Loading AI provider configuration...');
 
-    const configResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/config`);
-    const config = await configResponse.json();
+    // Import config handler directly to get unmasked keys (server-side only)
+    const { TableClient } = await import('@azure/data-tables');
+
+    const POWERNODE_STORAGE_CONNECTION =
+      process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
+    const TABLE_NAME = 'powernodeconfig';
+    const creatorId = 'default';
+
+    if (!POWERNODE_STORAGE_CONNECTION) {
+      throw new Error('Storage connection not configured');
+    }
+
+    const tableClient = TableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, TABLE_NAME);
+
+    let config;
+    try {
+      const entity = await tableClient.getEntity(creatorId, 'config');
+      const providers = entity.providers ? JSON.parse(entity.providers as string) : {};
+      config = {
+        providers,
+        defaultProvider: entity.defaultProvider || 'anthropic',
+        temperature: entity.temperature ?? 0.7,
+        maxTokens: entity.maxTokens ?? 4096,
+      };
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        throw new Error('No configuration found. Please configure AI providers first.');
+      }
+      throw error;
+    }
 
     const provider = config.defaultProvider || 'anthropic';
     const providerConfig = config.providers?.[provider];
