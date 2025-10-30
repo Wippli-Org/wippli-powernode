@@ -1,4 +1,4 @@
-import { Activity, FileText, Zap, Settings, ScrollText } from 'lucide-react';
+import { Activity, FileText, Zap, Settings, ScrollText, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -40,7 +40,23 @@ export default function HomePage() {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Chat Link */}
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Test Chat</h2>
+            <p className="text-gray-600 mb-6">
+              Chat with AI and see detailed execution logs with MCP tool calls
+            </p>
+
+            <Link
+              href="/chat"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              <MessageSquare className="w-5 h-5" />
+              Open Chat
+            </Link>
+          </div>
+
           {/* Configuration Link */}
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Configure PowerNode</h2>
