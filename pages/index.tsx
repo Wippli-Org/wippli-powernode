@@ -1,4 +1,4 @@
-import { Activity, FileText, Zap } from 'lucide-react';
+import { Activity, FileText, Zap, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -37,6 +37,22 @@ export default function HomePage() {
               Track AI token usage, storage costs, and get optimization recommendations.
             </p>
           </div>
+        </div>
+
+        {/* Configuration Link */}
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Configure PowerNode</h2>
+          <p className="text-gray-600 mb-6">
+            Set up AI providers, storage, and custom prompts for your MCP tools
+          </p>
+
+          <Link
+            href="/config"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-secondary text-white rounded-lg font-semibold hover:bg-secondary/90 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            Open Configuration
+          </Link>
         </div>
 
         {/* Demo Link */}
