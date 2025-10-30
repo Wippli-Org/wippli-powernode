@@ -385,12 +385,13 @@ export default function WorkflowsPage() {
           };
         });
 
-      const contextMessage = `Please debug this workflow node and provide specific suggestions:
+      const contextMessage = `Please debug this workflow node and provide a corrected configuration:
 
 **Node Information:**
 - Type: ${node.data.type}
 - Label: ${node.data.label || 'Untitled'}
-- Configuration: ${JSON.stringify(node.data.config, null, 2)}
+- Current Configuration: ${JSON.stringify(node.data.config, null, 2)}
+- MCP Server: ${node.data.mcpServer || 'Not selected'}
 
 **Workflow Context:**
 - Workflow: ${activeWorkflow?.name || 'Unknown'}
@@ -401,8 +402,18 @@ ${node.data.logs && node.data.logs.length > 0 ? node.data.logs.join('\n') : 'No 
 
 Please analyze this node and provide:
 1. Any issues or problems with the configuration
-2. Specific actionable suggestions for fixes
-3. Best practices for this type of node`;
+2. A corrected/optimized configuration as valid JSON
+3. Suggestions for the best MCP Server to use
+
+IMPORTANT: If you provide a corrected configuration, format it as a JSON code block like this:
+\`\`\`json
+{
+  "correctedConfig": { ... your corrected config ... },
+  "suggestedMcpServer": "msword" (optional)
+}
+\`\`\`
+
+I will automatically apply this corrected configuration to the node.`;
 
       // Call the existing chat API to maintain conversation context
       const response = await fetch('/api/chat-with-mcp', {
@@ -420,11 +431,53 @@ Please analyze this node and provide:
       if (response.ok && result.message) {
         addLogToNode(node.id, '✓ AI agent response received');
 
-        // Parse AI response and add to logs
         const aiResponse = result.message;
-        const lines = aiResponse.split('\n').slice(0, 5); // First 5 lines
+
+        // Try to extract corrected configuration from JSON code blocks
+        const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/;
+        const match = aiResponse.match(jsonBlockRegex);
+
+        if (match) {
+          try {
+            const correctionData = JSON.parse(match[1]);
+
+            // Apply corrected configuration
+            if (correctionData.correctedConfig) {
+              addLogToNode(node.id, '✓ Applying corrected configuration...');
+
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === node.id
+                    ? {
+                        ...n,
+                        data: {
+                          ...n.data,
+                          config: correctionData.correctedConfig,
+                          mcpServer: correctionData.suggestedMcpServer || n.data.mcpServer,
+                        },
+                      }
+                    : n
+                )
+              );
+
+              addLogToNode(node.id, '✓ Configuration updated automatically!');
+
+              if (correctionData.suggestedMcpServer) {
+                addLogToNode(
+                  node.id,
+                  `✓ MCP Server set to: ${correctionData.suggestedMcpServer}`
+                );
+              }
+            }
+          } catch (parseError) {
+            addLogToNode(node.id, '⚠ Could not parse corrected config');
+          }
+        }
+
+        // Show first few lines of AI response
+        const lines = aiResponse.split('\n').slice(0, 5);
         lines.forEach((line: string) => {
-          if (line.trim()) {
+          if (line.trim() && !line.includes('```')) {
             addLogToNode(node.id, line.trim());
           }
         });
