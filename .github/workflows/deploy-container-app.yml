@@ -43,11 +43,12 @@ jobs:
       - name: Prepare Docker build context
         run: |
           rm -rf build
-          mkdir -p build/.next
-          cp -r .next/standalone/* build/
-          cp -r .next/static build/.next/static
-          cp -r public build/public
+          mkdir -p build
+          cp -r .next/standalone/. build/
+          cp -r .next/static build/.next/
+          cp -r public build/
           ls -la build/
+          ls -la build/.next/
 
       - name: Log in to Azure
         uses: azure/login@v2
