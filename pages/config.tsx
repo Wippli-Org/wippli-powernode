@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check } from 'lucide-react';
+import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check, Send, MessageSquare } from 'lucide-react';
 
 interface AIProvider {
   enabled: boolean;
@@ -78,6 +78,12 @@ export default function ConfigPage() {
   // Dynamic models state
   const [providerModels, setProviderModels] = useState<Record<string, any[]>>({});
   const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+
+  // Test chat state
+  const [testMessage, setTestMessage] = useState('');
+  const [testResponse, setTestResponse] = useState('');
+  const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
 
   useEffect(() => {
     loadConfig();
@@ -162,6 +168,49 @@ export default function ConfigPage() {
       console.error(`Failed to fetch ${provider} models:`, error);
     } finally {
       setLoadingModels({ ...loadingModels, [provider]: false });
+    }
+  };
+
+  const testChat = async () => {
+    if (!testMessage.trim()) return;
+
+    setTestLoading(true);
+    setTestError(null);
+    setTestResponse('');
+
+    try {
+      // Find the default provider
+      const provider = config.defaultProvider;
+      const providerConfig = config.providers[provider];
+
+      if (!providerConfig || !providerConfig.enabled || !providerConfig.apiKey) {
+        throw new Error('Please enable and configure the default provider first');
+      }
+
+      const response = await fetch('/api/test-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          apiKey: providerConfig.apiKey,
+          model: providerConfig.model,
+          message: testMessage,
+          endpoint: (providerConfig as any).endpoint,
+          deployment: (providerConfig as any).deployment,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get response');
+      }
+
+      setTestResponse(data.reply);
+    } catch (error: any) {
+      setTestError(error.message || 'Failed to test chat');
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -465,6 +514,68 @@ export default function ConfigPage() {
                 />
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Test Chat */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare className="w-6 h-6 text-primary" />
+            <h2 className="text-xl font-semibold text-gray-900">Test Chat</h2>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Send a test message to verify your AI configuration is working. Uses your default provider.
+          </p>
+
+          <div className="space-y-4">
+            {/* Message Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && testChat()}
+                placeholder="Type a message... (e.g., 'Hello, how are you?')"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                disabled={testLoading}
+              />
+              <button
+                onClick={testChat}
+                disabled={testLoading || !testMessage.trim()}
+                className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testLoading ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    Send
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {testError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{testError}</p>
+              </div>
+            )}
+
+            {/* Response */}
+            {testResponse && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-start gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-semibold text-green-800">Response from AI:</p>
+                </div>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{testResponse}</p>
+              </div>
+            )}
           </div>
         </div>
 
