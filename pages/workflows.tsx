@@ -72,16 +72,16 @@ const MCP_SERVERS = [
   { id: 'azure', name: 'Azure MCP', description: 'Azure cloud services' },
 ];
 
-// Custom Node Component
+// Custom Node Component - Square icon with label below
 function InstructionNode({ data }: { data: any }) {
   const typeInfo = INSTRUCTION_TYPES[data.type as InstructionType];
   const Icon = typeInfo.icon;
 
+  // Get MCP icon if configured
+  const mcpServer = data.mcpServer ? MCP_SERVERS.find(s => s.id === data.mcpServer) : null;
+
   return (
-    <div
-      className="px-4 py-3 shadow-lg rounded-lg border-2 bg-white min-w-[180px] relative"
-      style={{ borderColor: typeInfo.color }}
-    >
+    <div className="relative">
       {/* Input Handle (left side) */}
       <Handle
         type="target"
@@ -91,19 +91,33 @@ function InstructionNode({ data }: { data: any }) {
           height: '12px',
           backgroundColor: typeInfo.color,
           border: '2px solid white',
+          left: '-6px',
         }}
       />
 
-      <div className="flex items-center gap-2">
-        <div
-          className="rounded p-2 flex-shrink-0"
-          style={{ backgroundColor: typeInfo.color }}
-        >
-          <Icon className="w-4 h-4 text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm text-gray-900">{typeInfo.label}</div>
-          <div className="text-xs text-gray-500 truncate">{data.label || 'Untitled'}</div>
+      {/* Square Icon Node */}
+      <div
+        className="w-16 h-16 rounded shadow-lg border-2 bg-white flex items-center justify-center relative"
+        style={{ borderColor: typeInfo.color }}
+      >
+        <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
+
+        {/* MCP Badge if configured */}
+        {mcpServer && (
+          <div
+            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border-2 flex items-center justify-center text-xs font-bold shadow"
+            style={{ borderColor: '#10b981' }}
+            title={mcpServer.name}
+          >
+            {mcpServer.name.substring(0, 2).toUpperCase()}
+          </div>
+        )}
+      </div>
+
+      {/* Label below node */}
+      <div className="absolute top-[68px] left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+        <div className="text-xs font-semibold text-gray-700 text-center">
+          {data.label || typeInfo.label}
         </div>
       </div>
 
@@ -116,6 +130,7 @@ function InstructionNode({ data }: { data: any }) {
           height: '12px',
           backgroundColor: typeInfo.color,
           border: '2px solid white',
+          right: '-6px',
         }}
       />
     </div>
@@ -671,135 +686,160 @@ I will automatically apply this corrected configuration to the node.`;
             </div>
           </div>
 
-          {/* Instruction Types Sidebar - Drag from here */}
+          {/* Instruction Types Sidebar - Drag square icons */}
           <div className="col-span-2 h-full border-r border-gray-200 bg-white overflow-y-auto">
             <div className="p-3 border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-700">Drag Instruction</h2>
+              <h2 className="text-sm font-semibold text-gray-700">Drag Icons</h2>
             </div>
-            <div className="p-2 space-y-4">
+            <div className="p-3 space-y-4">
               {/* File Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1 px-2">File Ops</h3>
-                {(['read', 'write', 'edit', 'delete', 'search', 'save'] as InstructionType[]).map((type) => {
-                  const typeInfo = INSTRUCTION_TYPES[type];
-                  const Icon = typeInfo.icon;
-                  return (
-                    <div
-                      key={type}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, type)}
-                      className="flex items-center gap-2 p-2 mb-1 border border-gray-200 rounded cursor-move hover:border-primary hover:bg-primary/5 transition-colors"
-                    >
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">File Ops</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['read', 'write', 'edit', 'delete', 'search', 'save'] as InstructionType[]).map((type) => {
+                    const typeInfo = INSTRUCTION_TYPES[type];
+                    const Icon = typeInfo.icon;
+                    return (
                       <div
-                        className="rounded p-1.5"
-                        style={{ backgroundColor: typeInfo.color }}
+                        key={type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, type)}
+                        className="cursor-move transition-transform hover:scale-110"
+                        title={typeInfo.label}
                       >
-                        <Icon className="w-3 h-3 text-white" />
+                        <div
+                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          style={{ borderColor: typeInfo.color }}
+                        >
+                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                        </div>
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                          {typeInfo.label}
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-gray-900">{typeInfo.label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* AI Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1 px-2">AI Ops</h3>
-                {(['transform', 'extract', 'analyse', 'translate'] as InstructionType[]).map((type) => {
-                  const typeInfo = INSTRUCTION_TYPES[type];
-                  const Icon = typeInfo.icon;
-                  return (
-                    <div
-                      key={type}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, type)}
-                      className="flex items-center gap-2 p-2 mb-1 border border-gray-200 rounded cursor-move hover:border-primary hover:bg-primary/5 transition-colors"
-                    >
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">AI Ops</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['transform', 'extract', 'analyse', 'translate'] as InstructionType[]).map((type) => {
+                    const typeInfo = INSTRUCTION_TYPES[type];
+                    const Icon = typeInfo.icon;
+                    return (
                       <div
-                        className="rounded p-1.5"
-                        style={{ backgroundColor: typeInfo.color }}
+                        key={type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, type)}
+                        className="cursor-move transition-transform hover:scale-110"
+                        title={typeInfo.label}
                       >
-                        <Icon className="w-3 h-3 text-white" />
+                        <div
+                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          style={{ borderColor: typeInfo.color }}
+                        >
+                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                        </div>
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                          {typeInfo.label}
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-gray-900">{typeInfo.label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Code Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1 px-2">Code Ops</h3>
-                {(['code', 'execute', 'debug', 'fix', 'test'] as InstructionType[]).map((type) => {
-                  const typeInfo = INSTRUCTION_TYPES[type];
-                  const Icon = typeInfo.icon;
-                  return (
-                    <div
-                      key={type}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, type)}
-                      className="flex items-center gap-2 p-2 mb-1 border border-gray-200 rounded cursor-move hover:border-primary hover:bg-primary/5 transition-colors"
-                    >
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Code Ops</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['code', 'execute', 'debug', 'fix', 'test'] as InstructionType[]).map((type) => {
+                    const typeInfo = INSTRUCTION_TYPES[type];
+                    const Icon = typeInfo.icon;
+                    return (
                       <div
-                        className="rounded p-1.5"
-                        style={{ backgroundColor: typeInfo.color }}
+                        key={type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, type)}
+                        className="cursor-move transition-transform hover:scale-110"
+                        title={typeInfo.label}
                       >
-                        <Icon className="w-3 h-3 text-white" />
+                        <div
+                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          style={{ borderColor: typeInfo.color }}
+                        >
+                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                        </div>
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                          {typeInfo.label}
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-gray-900">{typeInfo.label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Flow Control */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1 px-2">Flow</h3>
-                {(['decide', 'loop', 'wait'] as InstructionType[]).map((type) => {
-                  const typeInfo = INSTRUCTION_TYPES[type];
-                  const Icon = typeInfo.icon;
-                  return (
-                    <div
-                      key={type}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, type)}
-                      className="flex items-center gap-2 p-2 mb-1 border border-gray-200 rounded cursor-move hover:border-primary hover:bg-primary/5 transition-colors"
-                    >
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Flow</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['decide', 'loop', 'wait'] as InstructionType[]).map((type) => {
+                    const typeInfo = INSTRUCTION_TYPES[type];
+                    const Icon = typeInfo.icon;
+                    return (
                       <div
-                        className="rounded p-1.5"
-                        style={{ backgroundColor: typeInfo.color }}
+                        key={type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, type)}
+                        className="cursor-move transition-transform hover:scale-110"
+                        title={typeInfo.label}
                       >
-                        <Icon className="w-3 h-3 text-white" />
+                        <div
+                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          style={{ borderColor: typeInfo.color }}
+                        >
+                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                        </div>
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                          {typeInfo.label}
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-gray-900">{typeInfo.label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Integration */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1 px-2">Integration</h3>
-                {(['http', 'passTo', 'compare', 'correct'] as InstructionType[]).map((type) => {
-                  const typeInfo = INSTRUCTION_TYPES[type];
-                  const Icon = typeInfo.icon;
-                  return (
-                    <div
-                      key={type}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, type)}
-                      className="flex items-center gap-2 p-2 mb-1 border border-gray-200 rounded cursor-move hover:border-primary hover:bg-primary/5 transition-colors"
-                    >
+                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Integration</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['http', 'passTo', 'compare', 'correct'] as InstructionType[]).map((type) => {
+                    const typeInfo = INSTRUCTION_TYPES[type];
+                    const Icon = typeInfo.icon;
+                    return (
                       <div
-                        className="rounded p-1.5"
-                        style={{ backgroundColor: typeInfo.color }}
+                        key={type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, type)}
+                        className="cursor-move transition-transform hover:scale-110"
+                        title={typeInfo.label}
                       >
-                        <Icon className="w-3 h-3 text-white" />
+                        <div
+                          className="w-14 h-14 rounded shadow border-2 bg-white flex items-center justify-center"
+                          style={{ borderColor: typeInfo.color }}
+                        >
+                          <Icon className="w-6 h-6" style={{ color: typeInfo.color }} />
+                        </div>
+                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium truncate">
+                          {typeInfo.label}
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-gray-900">{typeInfo.label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
