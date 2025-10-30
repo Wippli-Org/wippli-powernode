@@ -8,33 +8,24 @@ const POWERNODE_STORAGE_CONNECTION =
   process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
 const TABLE_NAME = 'powernodeconfig';
 
+interface AIProvider {
+  enabled: boolean;
+  apiKey: string;
+  model: string;
+  endpoint?: string;
+  deployment?: string;
+}
+
 interface PowerNodeConfig {
   // Partition and row keys for Azure Table Storage
   partitionKey: string; // creator_id
   rowKey: string; // Always 'config'
 
-  // AI Provider Configuration
-  aiProvider: 'azure' | 'anthropic' | 'mistral';
-
-  // Azure OpenAI
-  azureOpenAIEndpoint?: string;
-  azureOpenAIKey?: string;
-  azureOpenAIDeployment?: string;
-  azureOpenAIEmbeddingDeployment?: string;
-  azureOpenAIApiVersion?: string;
-
-  // Anthropic Claude
-  anthropicApiKey?: string;
-
-  // Mistral
-  mistralApiKey?: string;
-
-  // Storage Configuration
-  powerNodeStorageConnection?: string;
-  azureStorageAccount?: string;
+  // NEW Multi-Provider Configuration (stored as JSON string)
+  providers?: string; // JSON: { openai: AIProvider, anthropic: AIProvider, etc }
+  defaultProvider?: 'openai' | 'anthropic' | 'google' | 'mistral' | 'azureOpenAI';
 
   // AI Configuration
-  defaultModel?: string;
   temperature?: number;
   maxTokens?: number;
 
@@ -69,24 +60,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         const entity = await tableClient.getEntity<PowerNodeConfig>(creatorId, 'config');
 
-        // Parse custom prompts JSON
+        // Parse providers and custom prompts JSON
+        const providers = entity.providers ? JSON.parse(entity.providers) : {};
         const customPrompts = entity.customPrompts ? JSON.parse(entity.customPrompts) : {};
+
+        // Mask API keys in providers
+        const maskedProviders: any = {};
+        for (const [key, provider] of Object.entries(providers)) {
+          const p = provider as any;
+          maskedProviders[key] = {
+            ...p,
+            apiKey: p.apiKey ? maskSecret(p.apiKey) : '',
+          };
+        }
 
         // Remove Azure Table Storage metadata and partition/row keys
         const config = {
-          aiProvider: entity.aiProvider || 'azure',
-          azureOpenAIEndpoint: entity.azureOpenAIEndpoint || '',
-          azureOpenAIKey: entity.azureOpenAIKey ? maskSecret(entity.azureOpenAIKey) : '',
-          azureOpenAIDeployment: entity.azureOpenAIDeployment || 'gpt-4o-powerdocs',
-          azureOpenAIEmbeddingDeployment: entity.azureOpenAIEmbeddingDeployment || 'text-embedding-3-large',
-          azureOpenAIApiVersion: entity.azureOpenAIApiVersion || '2024-08-01-preview',
-          anthropicApiKey: entity.anthropicApiKey ? maskSecret(entity.anthropicApiKey) : '',
-          mistralApiKey: entity.mistralApiKey ? maskSecret(entity.mistralApiKey) : '',
-          powerNodeStorageConnection: entity.powerNodeStorageConnection
-            ? maskSecret(entity.powerNodeStorageConnection)
-            : '',
-          azureStorageAccount: entity.azureStorageAccount || 'powernodeexecutions',
-          defaultModel: entity.defaultModel || 'gpt-4o',
+          providers: maskedProviders,
+          defaultProvider: entity.defaultProvider || 'anthropic',
           temperature: entity.temperature ?? 0.7,
           maxTokens: entity.maxTokens ?? 4096,
           customPrompts,
@@ -97,17 +88,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (error.statusCode === 404) {
           // Return default configuration if not found
           return res.status(200).json({
-            aiProvider: 'azure',
-            azureOpenAIEndpoint: '',
-            azureOpenAIKey: '',
-            azureOpenAIDeployment: 'gpt-4o-powerdocs',
-            azureOpenAIEmbeddingDeployment: 'text-embedding-3-large',
-            azureOpenAIApiVersion: '2024-08-01-preview',
-            anthropicApiKey: '',
-            mistralApiKey: '',
-            powerNodeStorageConnection: '',
-            azureStorageAccount: 'powernodeexecutions',
-            defaultModel: 'gpt-4o',
+            providers: {},
+            defaultProvider: 'anthropic',
             temperature: 0.7,
             maxTokens: 4096,
             customPrompts: {},
@@ -119,28 +101,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Save configuration
       const body = req.body;
 
-      // Validate required fields
-      if (!body.aiProvider) {
-        return res.status(400).json({ error: 'aiProvider is required' });
-      }
-
       // Prepare entity for Table Storage
       const entity: PowerNodeConfig = {
         partitionKey: creatorId,
         rowKey: 'config',
-        aiProvider: body.aiProvider,
-        azureOpenAIEndpoint: body.azureOpenAIEndpoint,
-        azureOpenAIKey: body.azureOpenAIKey,
-        azureOpenAIDeployment: body.azureOpenAIDeployment,
-        azureOpenAIEmbeddingDeployment: body.azureOpenAIEmbeddingDeployment,
-        azureOpenAIApiVersion: body.azureOpenAIApiVersion,
-        anthropicApiKey: body.anthropicApiKey,
-        mistralApiKey: body.mistralApiKey,
-        powerNodeStorageConnection: body.powerNodeStorageConnection,
-        azureStorageAccount: body.azureStorageAccount,
-        defaultModel: body.defaultModel,
-        temperature: body.temperature,
-        maxTokens: body.maxTokens,
+        providers: JSON.stringify(body.providers || {}),
+        defaultProvider: body.defaultProvider || 'anthropic',
+        temperature: body.temperature ?? 0.7,
+        maxTokens: body.maxTokens ?? 4096,
         customPrompts: JSON.stringify(body.customPrompts || {}),
         updatedAt: new Date().toISOString(),
       };
