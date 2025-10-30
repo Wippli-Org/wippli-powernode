@@ -9,7 +9,11 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/:token(pn_exec_[a-zA-Z0-9]+)',
+        source: '/:token(pn_wippli_[a-zA-Z0-9]+)',
+        destination: '/monitor/:token',
+      },
+      {
+        source: '/:token(pn_exec_[a-zA-Z0-9_]+)',
         destination: '/monitor/:token',
       },
     ];

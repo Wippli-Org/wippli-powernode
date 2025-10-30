@@ -82,21 +82,21 @@ export default function HomePage() {
           </p>
 
           <Link
-            href="/monitor/pn_exec_demo_7f8a9b2c1d3e4f5a"
+            href="/monitor/pn_wippli_337"
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
           >
             <Activity className="w-5 h-5" />
-            View Demo Execution
+            View Demo (Wippli 337)
           </Link>
 
           <div className="mt-8 text-left bg-gray-50 rounded-lg p-6 border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">How it works:</h3>
             <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
               <li>PowerNode executes MCP tools for Wippli tasks</li>
-              <li>Each execution gets a unique monitoring token</li>
-              <li>Access <code className="bg-white px-2 py-1 rounded text-xs">https://powernode.wippli.ai/{'pn_exec_{token}'}</code></li>
-              <li>View real-time logs, storage, configuration, and costs</li>
-              <li>Share the URL from n8n executions for easy debugging</li>
+              <li><strong>Each Wippli ID gets a unique monitoring token</strong></li>
+              <li>Access <code className="bg-white px-2 py-1 rounded text-xs">https://powernode.wippli.ai/pn_wippli_{'<id>'}</code></li>
+              <li>View <strong>ALL executions</strong> for that Wippli task with real-time logs</li>
+              <li>Share the URL from n8n - just use the Wippli ID!</li>
             </ol>
           </div>
         </div>

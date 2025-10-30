@@ -10,9 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Invalid token' });
   }
 
-  // Validate token format
-  if (!token.match(/^pn_exec_[a-zA-Z0-9_]+$/)) {
-    return res.status(400).json({ error: 'Invalid token format' });
+  // Validate token format - now accepts pn_wippli_{id} format
+  if (!token.match(/^pn_(wippli|exec)_[a-zA-Z0-9_]+$/)) {
+    return res.status(400).json({ error: 'Invalid token format. Expected: pn_wippli_{id}' });
   }
 
   // TODO: In production, query Azure Table Storage
