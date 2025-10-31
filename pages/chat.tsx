@@ -278,7 +278,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between">
@@ -300,11 +300,11 @@ export default function ChatPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0">
         <div className="h-full grid grid-cols-12 gap-0">
           {/* Conversations Sidebar */}
           <div className="col-span-12 lg:col-span-3 h-full border-r border-gray-200">
-            <div className="bg-white h-full flex flex-col">
+            <div className="bg-white h-full flex flex-col min-h-0">
               {/* Sidebar Header */}
               <div className="p-4 border-b border-gray-200">
                 <button
@@ -397,7 +397,7 @@ export default function ChatPage() {
           {/* Main Content Area */}
           <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-0">
           {/* Chat Panel */}
-          <div className="bg-white border-r border-gray-200 flex flex-col h-full">
+          <div className="bg-white border-r border-gray-200 flex flex-col h-full min-h-0">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
@@ -475,7 +475,7 @@ export default function ChatPage() {
           </div>
 
           {/* Execution Logs Panel */}
-          <div className="bg-white flex flex-col h-full">
+          <div className="bg-white flex flex-col h-full min-h-0">
             {/* Logs Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -493,7 +493,7 @@ export default function ChatPage() {
             {/* Logs Content */}
             {showLogs && (
               <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs">
-                {messages.length === 0 && (
+                {messages.filter(m => m.logs && m.logs.length > 0).length === 0 && (
                   <div className="text-center text-gray-500 mt-8">
                     <Terminal className="w-12 h-12 mx-auto mb-2 opacity-20" />
                     <p className="font-sans">No logs yet. Send a message to see execution logs.</p>
@@ -501,7 +501,7 @@ export default function ChatPage() {
                 )}
 
                 {messages.map((message) =>
-                  message.logs?.map((log, idx) => {
+                  message.logs && message.logs.length > 0 ? message.logs.map((log, idx) => {
                     const logId = `${message.id}-${idx}`;
                     const isExpanded = expandedLogs.has(logId);
 
@@ -538,7 +538,7 @@ export default function ChatPage() {
                         )}
                       </div>
                     );
-                  })
+                  }) : null
                 )}
 
                 <div ref={logsEndRef} />
