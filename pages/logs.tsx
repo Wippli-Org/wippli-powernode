@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Search, Filter, Download, Trash2, Pause, Play } from 'lucide-react';
+import { RefreshCw, Search, Filter, Download, Trash2, Pause, Play, Server, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 interface LogEntry {
   timestamp: string;
@@ -12,6 +12,16 @@ interface LogEntry {
   data?: any;
 }
 
+interface MCPStatus {
+  success: boolean;
+  hasConnection: boolean;
+  serverCount: number;
+  toolCount: number;
+  servers: any[];
+  tools: any[];
+  error?: string;
+}
+
 export default function LogsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([]);
@@ -20,6 +30,8 @@ export default function LogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
+  const [mcpStatus, setMcpStatus] = useState<MCPStatus | null>(null);
+  const [mcpLoading, setMcpLoading] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -43,9 +55,25 @@ export default function LogsPage() {
     }
   };
 
+  // Fetch MCP status
+  const fetchMcpStatus = async () => {
+    try {
+      const response = await fetch('/api/debug/mcp-status');
+      if (response.ok) {
+        const data = await response.json();
+        setMcpStatus(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch MCP status:', error);
+    } finally {
+      setMcpLoading(false);
+    }
+  };
+
   // Initial fetch
   useEffect(() => {
     fetchLogs();
+    fetchMcpStatus();
   }, []);
 
   // Auto-refresh every 2 seconds if enabled
@@ -135,6 +163,138 @@ export default function LogsPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Live Logs</h1>
           <p className="text-gray-600">Real-time PowerNode execution logs</p>
+        </div>
+
+        {/* MCP Connection Status */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Server className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold text-gray-900">MCP Connection Status</h2>
+            </div>
+            <button
+              onClick={fetchMcpStatus}
+              className="text-sm text-primary hover:text-primary/80 flex items-center gap-1"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
+
+          {mcpLoading ? (
+            <div className="flex items-center justify-center py-4 text-gray-500">
+              <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+              Loading MCP status...
+            </div>
+          ) : mcpStatus?.error ? (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-red-900">Connection Error</p>
+                <p className="text-xs text-red-700">{mcpStatus.error}</p>
+              </div>
+            </div>
+          ) : mcpStatus ? (
+            <div className="space-y-3">
+              {/* Connection Status */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  {mcpStatus.hasConnection ? (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-600">Database</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {mcpStatus.hasConnection ? 'Connected' : 'Disconnected'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <Server className="w-5 h-5 text-purple-500" />
+                  <div>
+                    <p className="text-xs text-gray-600">MCP Servers</p>
+                    <p className="text-sm font-semibold text-gray-900">{mcpStatus.serverCount}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <div>
+                    <p className="text-xs text-gray-600">Available Tools</p>
+                    <p className="text-sm font-semibold text-gray-900">{mcpStatus.toolCount}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  {mcpStatus.serverCount > 0 ? (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-yellow-500" />
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-600">Chat Integration</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {mcpStatus.serverCount > 0 ? 'Ready' : 'No Servers'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Server Details */}
+              {mcpStatus.servers && mcpStatus.servers.length > 0 && (
+                <details className="mt-2">
+                  <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-900 font-medium">
+                    View Server Details ({mcpStatus.servers.length} servers)
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {mcpStatus.servers.map((server: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-gray-900">{server.name}</p>
+                            <p className="text-xs text-gray-600 mt-1">{server.url}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs">
+                              <span className="text-gray-600">
+                                Tools: <span className="font-semibold text-gray-900">{server.tools.length}</span>
+                              </span>
+                              <span className="text-gray-600">
+                                API Key: {server.hasApiKey ? (
+                                  <span className="text-green-600 font-semibold">Configured</span>
+                                ) : (
+                                  <span className="text-gray-400">Not set</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {/* No Servers Warning */}
+              {mcpStatus.serverCount === 0 && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-900">No MCP Servers Configured</p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        The chat page won't have access to MCP tools until you add MCP servers.
+                        <a href="/mcp-tools" className="ml-1 underline hover:text-yellow-900">
+                          Add MCP servers here
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         {/* Controls */}
