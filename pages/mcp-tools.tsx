@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Server, CheckCircle, AlertCircle, Play, FileJson, Download, Plus,
-  Settings, Zap, Clock, Activity
+  Settings, Zap, Clock, Activity, X
 } from 'lucide-react';
 
 interface MCPTool {
