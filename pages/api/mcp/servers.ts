@@ -130,7 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const entity = await tableClient.getEntity(userId as string, id);
 
       const updatedEntity = {
-        ...entity,
+        partitionKey: userId as string,
+        rowKey: id,
         name: name || entity.name,
         description: description !== undefined ? description : entity.description,
         url: url || entity.url,
