@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Loader, AlertCircle, MessageSquare, Terminal, ChevronDown, ChevronRight, Trash2, Plus, Edit2, Check, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
   id: string;
@@ -300,11 +302,11 @@ export default function ChatPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 overflow-hidden">
         <div className="h-full grid grid-cols-12 gap-0">
           {/* Conversations Sidebar */}
-          <div className="col-span-12 lg:col-span-3 h-full border-r border-gray-200">
-            <div className="bg-white h-full flex flex-col min-h-0">
+          <div className="col-span-12 lg:col-span-3 h-full border-r border-gray-200 overflow-hidden">
+            <div className="bg-white h-full flex flex-col">
               {/* Sidebar Header */}
               <div className="p-4 border-b border-gray-200">
                 <button
@@ -395,9 +397,9 @@ export default function ChatPage() {
           </div>
 
           {/* Main Content Area */}
-          <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-0">
+          <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden">
           {/* Chat Panel */}
-          <div className="bg-white border-r border-gray-200 flex flex-col h-full min-h-0">
+          <div className="bg-white border-r border-gray-200 flex flex-col h-full overflow-hidden">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
@@ -425,7 +427,15 @@ export default function ChatPage() {
                         : 'bg-gray-100 text-gray-900'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                    {message.role === 'assistant' ? (
+                      <div className="text-sm prose prose-sm max-w-none prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:text-purple-600">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                    )}
                     <p className="text-xs mt-1 opacity-70">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
@@ -475,7 +485,7 @@ export default function ChatPage() {
           </div>
 
           {/* Execution Logs Panel */}
-          <div className="bg-white flex flex-col h-full min-h-0">
+          <div className="bg-white flex flex-col h-full overflow-hidden">
             {/* Logs Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
