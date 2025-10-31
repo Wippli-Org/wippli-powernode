@@ -16,6 +16,7 @@ interface MCPServer {
   name: string;
   description: string;
   url: string;
+  apiKey?: string;
   status: 'healthy' | 'degraded' | 'down';
   latency: number;
   uptime: number;
@@ -67,6 +68,7 @@ export default function MCPToolsPage() {
   const [newServerName, setNewServerName] = useState('');
   const [newServerDescription, setNewServerDescription] = useState('');
   const [newServerUrl, setNewServerUrl] = useState('');
+  const [newServerApiKey, setNewServerApiKey] = useState('');
 
   useEffect(() => {
     if (mcpServers.length > 0) {
@@ -164,6 +166,7 @@ export default function MCPToolsPage() {
       name: newServerName,
       description: newServerDescription || 'Custom MCP Server',
       url: newServerUrl,
+      apiKey: newServerApiKey || undefined,
       status: 'healthy',
       latency: 0,
       uptime: 100,
@@ -177,6 +180,7 @@ export default function MCPToolsPage() {
     setNewServerName('');
     setNewServerDescription('');
     setNewServerUrl('');
+    setNewServerApiKey('');
     setShowAddServer(false);
   };
 
@@ -455,12 +459,27 @@ export default function MCPToolsPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API Key (Optional)
+                </label>
+                <input
+                  type="password"
+                  value={newServerApiKey}
+                  onChange={(e) => setNewServerApiKey(e.target.value)}
+                  placeholder="Bearer token or API key for authentication"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave blank if server doesn't require authentication</p>
+              </div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <h4 className="text-sm font-semibold text-blue-900 mb-1">n8n MCP Example</h4>
                 <p className="text-xs text-blue-700 mb-2">To add n8n workflow execution:</p>
                 <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
                   <li>Name: "n8n Workflow MCP"</li>
                   <li>URL: Your n8n instance MCP endpoint</li>
+                  <li>API Key: Your n8n API key (if required)</li>
                   <li>Tools will be auto-discovered from server</li>
                 </ul>
               </div>
