@@ -8,15 +8,20 @@ import type { NextApiRequest, NextApiResponse } from 'next';
  *
  * Usage: Configure this as your MCP server URL in the MCP Tools page:
  * https://your-domain.com/api/mcp-server/n8n
+ *
+ * The API key should be configured in the MCP Tools page and will be passed via Authorization header.
  */
 
 const N8N_API_URL = process.env.N8N_API_URL || 'https://n8n.brannium.com/api/v1';
-const N8N_API_KEY = process.env.N8N_API_KEY;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Extract API key from Authorization header (sent by execute-tool API)
+  const authHeader = req.headers.authorization;
+  const n8nApiKey = authHeader?.replace('Bearer ', '');
 
   const { jsonrpc, id, method, params } = req.body;
 
@@ -91,12 +96,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { name, arguments: toolArgs } = params;
 
       // Check for API key
-      if (!N8N_API_KEY) {
+      if (!n8nApiKey) {
         return res.status(200).json({
           jsonrpc: '2.0',
           id,
           result: {
-            content: 'Error: N8N_API_KEY environment variable is not configured. Please set it in your deployment.',
+            content: 'Error: n8n API key is not configured. Please add an API key in the MCP Tools page.',
             isError: true,
           },
         });
@@ -106,11 +111,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let result;
 
       if (name === 'list_workflows') {
-        result = await listWorkflows();
+        result = await listWorkflows(n8nApiKey);
       } else if (name === 'execute_workflow') {
-        result = await executeWorkflow(toolArgs.workflowId, toolArgs.data);
+        result = await executeWorkflow(n8nApiKey, toolArgs.workflowId, toolArgs.data);
       } else if (name === 'get_workflow_status') {
-        result = await getWorkflowStatus(toolArgs.executionId);
+        result = await getWorkflowStatus(n8nApiKey, toolArgs.executionId);
       } else {
         return res.status(200).json({
           jsonrpc: '2.0',
@@ -153,10 +158,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function listWorkflows() {
+async function listWorkflows(apiKey: string) {
   const response = await fetch(`${N8N_API_URL}/workflows`, {
     headers: {
-      'X-N8N-API-KEY': N8N_API_KEY!,
+      'X-N8N-API-KEY': apiKey,
       'Accept': 'application/json',
     },
   });
@@ -181,11 +186,11 @@ async function listWorkflows() {
   };
 }
 
-async function executeWorkflow(workflowId: string, inputData?: any) {
+async function executeWorkflow(apiKey: string, workflowId: string, inputData?: any) {
   const response = await fetch(`${N8N_API_URL}/workflows/${workflowId}/execute`, {
     method: 'POST',
     headers: {
-      'X-N8N-API-KEY': N8N_API_KEY!,
+      'X-N8N-API-KEY': apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
@@ -207,10 +212,10 @@ async function executeWorkflow(workflowId: string, inputData?: any) {
   };
 }
 
-async function getWorkflowStatus(executionId: string) {
+async function getWorkflowStatus(apiKey: string, executionId: string) {
   const response = await fetch(`${N8N_API_URL}/executions/${executionId}`, {
     headers: {
-      'X-N8N-API-KEY': N8N_API_KEY!,
+      'X-N8N-API-KEY': apiKey,
       'Accept': 'application/json',
     },
   });
