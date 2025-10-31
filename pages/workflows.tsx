@@ -5,7 +5,6 @@ import ReactFlow, {
   addEdge,
   Background,
   Controls,
-  MiniMap,
   Connection,
   useNodesState,
   useEdgesState,
@@ -18,7 +17,7 @@ import 'reactflow/dist/style.css';
 import {
   Plus, Save, Play, Trash2, Settings, FileText, Edit3, FolderPlus, X, Search,
   GitBranch, Zap, RefreshCw, Clock, Globe, Code, Bug, CheckCircle, Copy,
-  FileSearch, Languages, PlayCircle, TestTube, Database, Send, Loader
+  FileSearch, Languages, PlayCircle, TestTube, Database, Send, Loader, Clipboard
 } from 'lucide-react';
 
 // Instruction node types with icons and colors
@@ -155,11 +154,12 @@ export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [activeWorkflow, setActiveWorkflow] = useState<Workflow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesState] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [executionLog, setExecutionLog] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
 
   // Load workflows from localStorage
   useEffect(() => {
@@ -598,6 +598,38 @@ I will automatically apply this corrected configuration to the node.`;
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const copySelectedNodesToClipboard = async () => {
+    const selectedNodes = nodes.filter(node => node.selected);
+
+    if (selectedNodes.length === 0) {
+      alert('No nodes selected. Click nodes or drag to select multiple nodes.');
+      return;
+    }
+
+    // Get edges that connect selected nodes
+    const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
+    const selectedEdges = edges.filter(
+      edge => selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+    );
+
+    const exportData = {
+      nodes: selectedNodes,
+      edges: selectedEdges,
+      count: selectedNodes.length,
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy to clipboard');
+    }
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header */}
@@ -617,6 +649,24 @@ I will automatically apply this corrected configuration to the node.`;
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={copySelectedNodesToClipboard}
+              disabled={nodes.filter(n => n.selected).length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              title="Copy selected nodes as JSON"
+            >
+              {copied ? (
+                <>
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Clipboard className="w-4 h-4" />
+                  Copy
+                </>
+              )}
+            </button>
             <button
               onClick={createNewWorkflow}
               className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
@@ -858,10 +908,13 @@ I will automatically apply this corrected configuration to the node.`;
                 onDragOver={onDragOver}
                 nodeTypes={nodeTypes}
                 fitView
+                panOnScroll
+                selectionOnDrag
+                panOnDrag={[1, 2]}
+                selectionMode="partial"
               >
                 <Background />
                 <Controls />
-                <MiniMap />
               </ReactFlow>
             ) : (
               <div className="flex items-center justify-center h-full">
