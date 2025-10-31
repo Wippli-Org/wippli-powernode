@@ -140,6 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status: status || entity.status,
         latency: latency !== undefined ? latency : entity.latency,
         uptime: uptime !== undefined ? uptime : entity.uptime,
+        createdAt: entity.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 

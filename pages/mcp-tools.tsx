@@ -7,8 +7,9 @@ import {
 interface MCPTool {
   name: string;
   description: string;
-  lastUsed: string;
-  schema: any;
+  lastUsed?: string;
+  schema?: any;
+  inputSchema?: any;  // Standard MCP format
 }
 
 interface MCPServer {
@@ -571,7 +572,7 @@ export default function MCPToolsPage() {
                               <p className="text-sm font-medium text-gray-900 truncate">{tool.name}</p>
                               <p className="text-xs text-gray-500">{tool.description}</p>
                             </div>
-                            <span className="text-xs text-gray-400 ml-2">{tool.lastUsed}</span>
+                            <span className="text-xs text-gray-400 ml-2">{tool.lastUsed || 'Never'}</span>
                           </div>
                         </div>
                       ))}
