@@ -56,13 +56,14 @@ const INITIAL_MCP_SERVERS: MCPServer[] = [
 ];
 
 export default function MCPToolsPage() {
-  const [mcpServers, setMcpServers] = useState<MCPServer[]>(INITIAL_MCP_SERVERS);
+  const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<MCPServer | null>(null);
   const [selectedTool, setSelectedTool] = useState<MCPTool | null>(null);
   const [toolArgs, setToolArgs] = useState<string>('{\n  \n}');
   const [testResult, setTestResult] = useState<string>('');
   const [testing, setTesting] = useState(false);
   const [showAddServer, setShowAddServer] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Add Server Form State
   const [newServerName, setNewServerName] = useState('');
@@ -70,10 +71,33 @@ export default function MCPToolsPage() {
   const [newServerUrl, setNewServerUrl] = useState('');
   const [newServerApiKey, setNewServerApiKey] = useState('');
 
+  // Fetch servers on page load
   useEffect(() => {
-    if (mcpServers.length > 0) {
-      setSelectedServer(mcpServers[0]);
-    }
+    const fetchServers = async () => {
+      try {
+        const response = await fetch('/api/mcp/servers');
+        if (response.ok) {
+          const data = await response.json();
+          setMcpServers(data.servers || []);
+          if (data.servers && data.servers.length > 0) {
+            setSelectedServer(data.servers[0]);
+          }
+        } else {
+          // If no servers found, use initial test server
+          setMcpServers(INITIAL_MCP_SERVERS);
+          setSelectedServer(INITIAL_MCP_SERVERS[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching servers:', error);
+        // Fallback to test server
+        setMcpServers(INITIAL_MCP_SERVERS);
+        setSelectedServer(INITIAL_MCP_SERVERS[0]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServers();
   }, []);
 
   useEffect(() => {
@@ -115,19 +139,40 @@ export default function MCPToolsPage() {
       // Validate JSON
       const args = JSON.parse(toolArgs);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call backend API to execute tool
+      const response = await fetch('/api/mcp/execute-tool', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          serverId: selectedServer.id,
+          toolName: selectedTool.name,
+          arguments: args,
+        }),
+      });
 
-      const mockResult = {
-        success: true,
-        message: `${selectedTool.name} executed successfully`,
-        tool: selectedTool.name,
-        server: selectedServer.name,
-        execution_time: `${selectedServer.latency}ms`,
-        data: args
-      };
+      const result = await response.json();
 
-      setTestResult(JSON.stringify(mockResult, null, 2));
+      if (response.ok) {
+        setTestResult(JSON.stringify(result, null, 2));
+
+        // Update server latency in state
+        if (result.latency !== undefined) {
+          setMcpServers(prevServers =>
+            prevServers.map(s =>
+              s.id === selectedServer.id
+                ? { ...s, latency: result.latency }
+                : s
+            )
+          );
+        }
+      } else {
+        setTestResult(JSON.stringify({
+          success: false,
+          error: result.error || 'Failed to execute tool',
+        }, null, 2));
+      }
     } catch (error: any) {
       setTestResult(JSON.stringify({
         success: false,
@@ -155,33 +200,73 @@ export default function MCPToolsPage() {
     a.click();
   };
 
-  const handleAddServer = () => {
+  const handleAddServer = async () => {
     if (!newServerName || !newServerUrl) {
       alert('Please fill in server name and URL');
       return;
     }
 
-    const newServer: MCPServer = {
-      id: newServerName.toLowerCase().replace(/\s+/g, '-'),
-      name: newServerName,
-      description: newServerDescription || 'Custom MCP Server',
-      url: newServerUrl,
-      apiKey: newServerApiKey || undefined,
-      status: 'healthy',
-      latency: 0,
-      uptime: 100,
-      tools: [] // Will be populated when server is queried
-    };
+    try {
+      const serverId = newServerName.toLowerCase().replace(/\s+/g, '-');
 
-    setMcpServers([...mcpServers, newServer]);
-    setSelectedServer(newServer);
+      // Call backend API to add server
+      const response = await fetch('/api/mcp/servers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: serverId,
+          name: newServerName,
+          description: newServerDescription || 'Custom MCP Server',
+          url: newServerUrl,
+          apiKey: newServerApiKey || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Add server to local state
+        const newServer: MCPServer = data.server || {
+          id: serverId,
+          name: newServerName,
+          description: newServerDescription || 'Custom MCP Server',
+          url: newServerUrl,
+          apiKey: newServerApiKey || undefined,
+          status: 'healthy',
+          latency: 0,
+          uptime: 100,
+          tools: [],
+        };
+
+        setMcpServers([...mcpServers, newServer]);
+        setSelectedServer(newServer);
+        setShowAddServer(false);
+
+        // Reset form
+        setNewServerName('');
+        setNewServerDescription('');
+        setNewServerUrl('');
+        setNewServerApiKey('');
+      } else {
+        const error = await response.json();
+        alert(`Failed to add server: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error adding server:', error);
+      alert(`Error adding server: ${error.message}`);
+    }
+  };
+
+  const handleCancelAddServer = () => {
+    setShowAddServer(false);
 
     // Reset form
     setNewServerName('');
     setNewServerDescription('');
     setNewServerUrl('');
     setNewServerApiKey('');
-    setShowAddServer(false);
   };
 
   return (
