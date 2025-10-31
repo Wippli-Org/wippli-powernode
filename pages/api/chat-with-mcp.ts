@@ -240,12 +240,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
 
             toolResults.push({
+              type: 'tool_result',
               tool_use_id: toolUseId,
               content: JSON.stringify(toolData.result),
             });
           } else {
             addLog('ERROR', 'MCP Executor', `Tool execution failed: ${toolData.error}`);
             toolResults.push({
+              type: 'tool_result',
               tool_use_id: toolUseId,
               content: `Error: ${toolData.error || 'Tool execution failed'}`,
               is_error: true,
@@ -254,6 +256,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } catch (error: any) {
           addLog('ERROR', 'MCP Executor', `Failed to execute tool: ${error.message}`);
           toolResults.push({
+            type: 'tool_result',
             tool_use_id: toolUseId,
             content: `Error: ${error.message}`,
             is_error: true,
