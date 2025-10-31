@@ -57,8 +57,8 @@ const INSTRUCTION_TYPES = {
 
 type InstructionType = keyof typeof INSTRUCTION_TYPES;
 
-// Available MCP Servers
-const MCP_SERVERS = [
+// Default MCP Servers (fallback if API fails)
+const DEFAULT_MCP_SERVERS = [
   { id: 'filesystem', name: 'File System MCP', description: 'Local file operations' },
   { id: 'msword', name: 'MS Word MCP', description: 'Microsoft Word documents' },
   { id: 'excel', name: 'MS Excel MCP', description: 'Microsoft Excel spreadsheets' },
@@ -72,12 +72,13 @@ const MCP_SERVERS = [
 ];
 
 // Custom Node Component - Square icon with label below
-function InstructionNode({ data }: { data: any }) {
+function InstructionNode({ data, mcpServers }: { data: any; mcpServers?: any[] }) {
   const typeInfo = INSTRUCTION_TYPES[data.type as InstructionType];
   const Icon = typeInfo.icon;
 
   // Get MCP icon if configured
-  const mcpServer = data.mcpServer ? MCP_SERVERS.find(s => s.id === data.mcpServer) : null;
+  const serverList = mcpServers || DEFAULT_MCP_SERVERS;
+  const mcpServer = data.mcpServer ? serverList.find(s => s.id === data.mcpServer) : null;
 
   return (
     <div className="relative">
@@ -160,6 +161,44 @@ export default function WorkflowsPage() {
   const [executing, setExecuting] = useState(false);
   const [executionLog, setExecutionLog] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [mcpServers, setMcpServers] = useState<any[]>(DEFAULT_MCP_SERVERS);
+
+  // Fetch MCP servers from API
+  useEffect(() => {
+    fetch('/api/mcp/servers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.servers && data.servers.length > 0) {
+          setMcpServers(data.servers);
+        } else {
+          setMcpServers(DEFAULT_MCP_SERVERS);
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching MCP servers:', error);
+        setMcpServers(DEFAULT_MCP_SERVERS);
+      });
+  }, []);
+
+  // Listen for localStorage sync events from MCP Tools page
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'mcp-servers-updated') {
+        // Refetch MCP servers when they change in MCP Tools page
+        fetch('/api/mcp/servers')
+          .then(res => res.json())
+          .then(data => {
+            if (data.servers) {
+              setMcpServers(data.servers);
+            }
+          })
+          .catch(err => console.error('Failed to reload MCP servers:', err));
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Load workflows from localStorage
   useEffect(() => {
@@ -986,7 +1025,7 @@ I will automatically apply this corrected configuration to the node.`;
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
                       >
                         <option value="">Select MCP Server...</option>
-                        {MCP_SERVERS.map((server) => (
+                        {mcpServers.map((server: any) => (
                           <option key={server.id} value={server.id}>
                             {server.name}
                           </option>
@@ -994,7 +1033,7 @@ I will automatically apply this corrected configuration to the node.`;
                       </select>
                       {selectedNode.data.mcpServer && (
                         <p className="text-xs text-gray-500 mt-1">
-                          {MCP_SERVERS.find(s => s.id === selectedNode.data.mcpServer)?.description}
+                          {mcpServers.find((s: any) => s.id === selectedNode.data.mcpServer)?.description}
                         </p>
                       )}
                     </div>
