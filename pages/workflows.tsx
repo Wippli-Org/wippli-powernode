@@ -911,7 +911,6 @@ I will automatically apply this corrected configuration to the node.`;
                 panOnScroll
                 selectionOnDrag
                 panOnDrag={[1, 2]}
-                selectionMode="partial"
               >
                 <Background />
                 <Controls />

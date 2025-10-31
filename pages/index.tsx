@@ -1,4 +1,4 @@
-import { Activity, FileText, Zap, Settings, ScrollText, MessageSquare, GitBranch } from 'lucide-react';
+import { Activity, FileText, Zap, Settings, ScrollText, MessageSquare, GitBranch, Server } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
@@ -40,7 +40,7 @@ export default function HomePage() {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {/* Workflow Builder Link */}
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Workflow Builder</h2>
@@ -54,6 +54,22 @@ export default function HomePage() {
             >
               <GitBranch className="w-5 h-5" />
               Open Builder
+            </Link>
+          </div>
+
+          {/* MCP Tools Link */}
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">MCP Tools</h2>
+            <p className="text-gray-600 mb-6">
+              Manage and test Model Context Protocol servers and tools
+            </p>
+
+            <Link
+              href="/mcp-tools"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              <Server className="w-5 h-5" />
+              Manage Tools
             </Link>
           </div>
 
