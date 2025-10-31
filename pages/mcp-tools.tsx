@@ -550,10 +550,10 @@ export default function MCPToolsPage() {
                   {/* Tools List */}
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <h4 className="text-xs font-semibold text-gray-700 mb-2">
-                      Available Tools ({server.tools.length})
+                      Available Tools ({server.tools?.length || 0})
                     </h4>
                     <div className="space-y-2">
-                      {server.tools.map((tool) => (
+                      {(server.tools || []).map((tool) => (
                         <div
                           key={tool.name}
                           onClick={(e) => {
