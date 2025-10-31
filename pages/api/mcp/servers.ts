@@ -47,6 +47,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const servers: MCPServer[] = [];
       for await (const entity of entities) {
+        let tools = [];
+        try {
+          if (entity.tools && typeof entity.tools === 'string') {
+            tools = JSON.parse(entity.tools);
+          } else if (entity.tools && Array.isArray(entity.tools)) {
+            tools = entity.tools;
+          }
+        } catch (error) {
+          console.error(`Failed to parse tools for server ${entity.rowKey}:`, error);
+          tools = [];
+        }
+
         servers.push({
           id: entity.rowKey as string,
           name: entity.name as string,
@@ -56,9 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status: (entity.status as 'healthy' | 'degraded' | 'down') || 'healthy',
           latency: (entity.latency as number) || 0,
           uptime: (entity.uptime as number) || 100,
-          tools: entity.tools ? JSON.parse(entity.tools as string) : [],
-          createdAt: entity.createdAt as string,
-          updatedAt: entity.updatedAt as string,
+          tools: tools,
+          createdAt: entity.createdAt as string || new Date().toISOString(),
+          updatedAt: entity.updatedAt as string || new Date().toISOString(),
         });
       }
 
