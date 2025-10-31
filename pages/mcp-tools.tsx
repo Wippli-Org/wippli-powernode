@@ -72,6 +72,7 @@ export default function MCPToolsPage() {
   const [newServerDescription, setNewServerDescription] = useState('');
   const [newServerUrl, setNewServerUrl] = useState('');
   const [newServerApiKey, setNewServerApiKey] = useState('');
+  const [newServerTools, setNewServerTools] = useState('[]');
 
   // Fetch servers on page load
   useEffect(() => {
@@ -308,12 +309,26 @@ export default function MCPToolsPage() {
     setNewServerDescription(server.description);
     setNewServerUrl(server.url);
     setNewServerApiKey(server.apiKey || '');
+    setNewServerTools(JSON.stringify(server.tools || [], null, 2));
     setShowEditServer(true);
   };
 
   const handleSaveEditServer = async () => {
     if (!editingServer || !newServerName || !newServerUrl) {
       alert('Please fill in server name and URL');
+      return;
+    }
+
+    // Parse and validate tools JSON
+    let parsedTools;
+    try {
+      parsedTools = JSON.parse(newServerTools);
+      if (!Array.isArray(parsedTools)) {
+        alert('Tools must be a JSON array');
+        return;
+      }
+    } catch (error) {
+      alert('Invalid JSON in Tools field');
       return;
     }
 
@@ -329,6 +344,7 @@ export default function MCPToolsPage() {
           description: newServerDescription,
           url: newServerUrl,
           apiKey: newServerApiKey || undefined,
+          tools: parsedTools,
         }),
       });
 
@@ -343,6 +359,7 @@ export default function MCPToolsPage() {
                   description: newServerDescription,
                   url: newServerUrl,
                   apiKey: newServerApiKey || undefined,
+                  tools: parsedTools,
                 }
               : s
           )
@@ -356,6 +373,7 @@ export default function MCPToolsPage() {
             description: newServerDescription,
             url: newServerUrl,
             apiKey: newServerApiKey || undefined,
+            tools: parsedTools,
           });
         }
 
@@ -370,6 +388,7 @@ export default function MCPToolsPage() {
         setNewServerDescription('');
         setNewServerUrl('');
         setNewServerApiKey('');
+        setNewServerTools('[]');
       } else {
         const error = await response.json();
         alert(`Failed to update server: ${error.error || 'Unknown error'}`);
@@ -834,6 +853,20 @@ export default function MCPToolsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave blank to keep existing API key</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tools (JSON Array)
+                </label>
+                <textarea
+                  value={newServerTools}
+                  onChange={(e) => setNewServerTools(e.target.value)}
+                  placeholder={`[\n  {\n    "name": "tool_name",\n    "description": "What this tool does",\n    "inputSchema": {\n      "type": "object",\n      "properties": {}\n    }\n  }\n]`}
+                  rows={8}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">JSON array of tools available on this MCP server</p>
               </div>
 
               <div className="flex gap-2 pt-2">
