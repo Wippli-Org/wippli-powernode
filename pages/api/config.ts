@@ -37,8 +37,8 @@ interface PowerNodeConfig {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Get creator ID from query or default to 'default'
-  const creatorId = (req.query.creatorId as string) || 'default';
+  // Get creator ID from query or default to 'default-user'
+  const creatorId = (req.query.creatorId as string) || 'default-user';
 
   if (!POWERNODE_STORAGE_CONNECTION) {
     return res.status(500).json({
