@@ -22,105 +22,32 @@ interface MCPServer {
   tools: MCPTool[];
 }
 
-// Sample MCP servers based on the PowerDocs design
+// Sample test MCP server
 const INITIAL_MCP_SERVERS: MCPServer[] = [
   {
-    id: 'document-ops',
-    name: 'Document Operations MCP',
-    description: 'Edit Word, Excel, and PDF documents programmatically',
-    url: 'https://powerdocs.wippli.ai/mcp/document-ops',
+    id: 'test-mcp',
+    name: 'Test MCP Server',
+    description: 'Example MCP server for testing tool execution',
+    url: 'http://localhost:3000/mcp/test',
     status: 'healthy',
-    latency: 23,
-    uptime: 99.9,
-    tools: [
-      {
-        name: 'edit_word_document',
-        description: 'Edit Microsoft Word documents with operations',
-        lastUsed: '5m ago',
-        schema: {
-          filepath: { type: 'string', required: true, description: 'Path to Word document' },
-          operations: { type: 'array', required: true, description: 'Array of edit operations' }
-        }
-      },
-      {
-        name: 'edit_excel_file',
-        description: 'Modify Excel spreadsheets, cells, and formulas',
-        lastUsed: '12m ago',
-        schema: {
-          filepath: { type: 'string', required: true, description: 'Path to Excel file' },
-          sheet: { type: 'string', required: false, description: 'Sheet name' },
-          operations: { type: 'array', required: true, description: 'Array of operations' }
-        }
-      },
-      {
-        name: 'convert_word_to_pdf',
-        description: 'Convert Word documents to PDF format',
-        lastUsed: '1h ago',
-        schema: {
-          source: { type: 'string', required: true, description: 'Source Word file' },
-          destination: { type: 'string', required: true, description: 'Destination PDF path' }
-        }
-      },
-      {
-        name: 'create_word_document',
-        description: 'Create new Word documents from text',
-        lastUsed: '3h ago',
-        schema: {
-          filepath: { type: 'string', required: true, description: 'Destination file path' },
-          content: { type: 'string', required: true, description: 'Document content' }
-        }
-      },
-      {
-        name: 'merge_pdfs',
-        description: 'Combine multiple PDF files into one',
-        lastUsed: 'Yesterday',
-        schema: {
-          sources: { type: 'array', required: true, description: 'Array of source PDF paths' },
-          destination: { type: 'string', required: true, description: 'Output PDF path' }
-        }
-      }
-    ]
-  },
-  {
-    id: 'wippli-context',
-    name: 'Wippli Context MCP',
-    description: 'Query Wippli tasks, comments, proofs, and company data',
-    url: 'https://powerdocs.wippli.ai/mcp/wippli-context',
-    status: 'healthy',
-    latency: 15,
+    latency: 12,
     uptime: 100,
     tools: [
       {
-        name: 'get_wippli_task',
-        description: 'Retrieve Wippli task details by ID',
-        lastUsed: '2m ago',
+        name: 'echo',
+        description: 'Echo back the provided message',
+        lastUsed: 'Never',
         schema: {
-          task_id: { type: 'string', required: true, description: 'Wippli task ID' }
+          message: { type: 'string', required: true, description: 'Message to echo' }
         }
       },
       {
-        name: 'get_comments',
-        description: 'Fetch comments for a Wippli task',
-        lastUsed: '10m ago',
+        name: 'add',
+        description: 'Add two numbers together',
+        lastUsed: 'Never',
         schema: {
-          task_id: { type: 'string', required: true, description: 'Task ID' },
-          limit: { type: 'number', required: false, description: 'Max comments to return' }
-        }
-      },
-      {
-        name: 'get_proofs',
-        description: 'Get proof versions for a task',
-        lastUsed: '30m ago',
-        schema: {
-          task_id: { type: 'string', required: true, description: 'Task ID' }
-        }
-      },
-      {
-        name: 'query_company_data',
-        description: 'Query company information and settings',
-        lastUsed: '1h ago',
-        schema: {
-          query: { type: 'string', required: true, description: 'Query string' }
+          a: { type: 'number', required: true, description: 'First number' },
+          b: { type: 'number', required: true, description: 'Second number' }
         }
       }
     ]
@@ -135,6 +62,11 @@ export default function MCPToolsPage() {
   const [testResult, setTestResult] = useState<string>('');
   const [testing, setTesting] = useState(false);
   const [showAddServer, setShowAddServer] = useState(false);
+
+  // Add Server Form State
+  const [newServerName, setNewServerName] = useState('');
+  const [newServerDescription, setNewServerDescription] = useState('');
+  const [newServerUrl, setNewServerUrl] = useState('');
 
   useEffect(() => {
     if (mcpServers.length > 0) {
@@ -219,6 +151,33 @@ export default function MCPToolsPage() {
     a.href = url;
     a.download = 'mcp-config.json';
     a.click();
+  };
+
+  const handleAddServer = () => {
+    if (!newServerName || !newServerUrl) {
+      alert('Please fill in server name and URL');
+      return;
+    }
+
+    const newServer: MCPServer = {
+      id: newServerName.toLowerCase().replace(/\s+/g, '-'),
+      name: newServerName,
+      description: newServerDescription || 'Custom MCP Server',
+      url: newServerUrl,
+      status: 'healthy',
+      latency: 0,
+      uptime: 100,
+      tools: [] // Will be populated when server is queried
+    };
+
+    setMcpServers([...mcpServers, newServer]);
+    setSelectedServer(newServer);
+
+    // Reset form
+    setNewServerName('');
+    setNewServerDescription('');
+    setNewServerUrl('');
+    setShowAddServer(false);
   };
 
   return (
@@ -441,6 +400,89 @@ export default function MCPToolsPage() {
           </div>
         </div>
       </div>
+
+      {/* Add MCP Server Modal */}
+      {showAddServer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add MCP Server</h3>
+              <button
+                onClick={() => setShowAddServer(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Server Name *
+                </label>
+                <input
+                  type="text"
+                  value={newServerName}
+                  onChange={(e) => setNewServerName(e.target.value)}
+                  placeholder="e.g., n8n Workflow MCP"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={newServerDescription}
+                  onChange={(e) => setNewServerDescription(e.target.value)}
+                  placeholder="e.g., Execute n8n workflows via MCP"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Server URL *
+                </label>
+                <input
+                  type="text"
+                  value={newServerUrl}
+                  onChange={(e) => setNewServerUrl(e.target.value)}
+                  placeholder="e.g., https://n8n.example.com/mcp"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="text-sm font-semibold text-blue-900 mb-1">n8n MCP Example</h4>
+                <p className="text-xs text-blue-700 mb-2">To add n8n workflow execution:</p>
+                <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+                  <li>Name: "n8n Workflow MCP"</li>
+                  <li>URL: Your n8n instance MCP endpoint</li>
+                  <li>Tools will be auto-discovered from server</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setShowAddServer(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddServer}
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Add Server
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
