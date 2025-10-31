@@ -140,15 +140,18 @@ export default function MCPToolsPage() {
 
   const generateExampleArgs = (tool: MCPTool): string => {
     const example: any = {};
-    Object.entries(tool.schema).forEach(([key, value]: [string, any]) => {
-      if (value.type === 'string') {
-        example[key] = value.description.includes('path') ? '/path/to/file' : 'example value';
-      } else if (value.type === 'array') {
-        example[key] = [];
-      } else if (value.type === 'number') {
-        example[key] = 10;
-      }
-    });
+    const schema = tool.inputSchema?.properties || tool.schema || {};
+    if (schema && typeof schema === 'object') {
+      Object.entries(schema).forEach(([key, value]: [string, any]) => {
+        if (value.type === 'string') {
+          example[key] = value.description?.includes('path') ? '/path/to/file' : 'example value';
+        } else if (value.type === 'array') {
+          example[key] = [];
+        } else if (value.type === 'number') {
+          example[key] = 10;
+        }
+      });
+    }
     return JSON.stringify(example, null, 2);
   };
 
@@ -664,16 +667,22 @@ export default function MCPToolsPage() {
                   <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <h3 className="text-sm font-semibold text-blue-900 mb-2">Tool Schema</h3>
                     <div className="space-y-2">
-                      {Object.entries(selectedTool.schema).map(([key, value]: [string, any]) => (
-                        <div key={key} className="text-sm">
-                          <span className="font-medium text-blue-900">{key}</span>
-                          <span className="text-blue-700"> ({value.type})</span>
-                          {value.required && (
-                            <span className="ml-1 text-xs text-red-600">*required</span>
-                          )}
-                          <p className="text-xs text-blue-600 mt-1">{value.description}</p>
-                        </div>
-                      ))}
+                      {(() => {
+                        const schema = selectedTool.inputSchema?.properties || selectedTool.schema || {};
+                        if (schema && typeof schema === 'object') {
+                          return Object.entries(schema).map(([key, value]: [string, any]) => (
+                            <div key={key} className="text-sm">
+                              <span className="font-medium text-blue-900">{key}</span>
+                              <span className="text-blue-700"> ({value.type})</span>
+                              {value.required && (
+                                <span className="ml-1 text-xs text-red-600">*required</span>
+                              )}
+                              <p className="text-xs text-blue-600 mt-1">{value.description}</p>
+                            </div>
+                          ));
+                        }
+                        return <p className="text-sm text-gray-500">No schema information available</p>;
+                      })()}
                     </div>
                   </div>
 
