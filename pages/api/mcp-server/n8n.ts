@@ -87,6 +87,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 required: ['executionId'],
               },
             },
+            {
+              name: 'get_workflow_details',
+              description: 'Get detailed information about a specific workflow including its nodes, connections, and configuration',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  workflowId: {
+                    type: 'string',
+                    description: 'The ID of the workflow to inspect',
+                  },
+                },
+                required: ['workflowId'],
+              },
+            },
           ],
         },
       });
@@ -116,6 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         result = await executeWorkflow(n8nApiKey, toolArgs.workflowId, toolArgs.data);
       } else if (name === 'get_workflow_status') {
         result = await getWorkflowStatus(n8nApiKey, toolArgs.executionId);
+      } else if (name === 'get_workflow_details') {
+        result = await getWorkflowDetails(n8nApiKey, toolArgs.workflowId);
       } else {
         return res.status(200).json({
           jsonrpc: '2.0',
@@ -234,6 +250,48 @@ async function getWorkflowStatus(apiKey: string, executionId: string) {
       stoppedAt: data.data.stoppedAt,
       mode: data.data.mode,
       workflowId: data.data.workflowId,
+    }, null, 2),
+  };
+}
+
+async function getWorkflowDetails(apiKey: string, workflowId: string) {
+  const response = await fetch(`${N8N_API_URL}/workflows/${workflowId}`, {
+    headers: {
+      'X-N8N-API-KEY': apiKey,
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`n8n API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const workflow = data.data;
+
+  // Extract node information
+  const nodes = workflow.nodes?.map((node: any) => ({
+    name: node.name,
+    type: node.type,
+    position: node.position,
+    parameters: node.parameters,
+  })) || [];
+
+  // Extract connection information
+  const connections = workflow.connections || {};
+
+  return {
+    content: JSON.stringify({
+      id: workflow.id,
+      name: workflow.name,
+      active: workflow.active,
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
+      nodeCount: nodes.length,
+      nodes: nodes,
+      connections: connections,
+      tags: workflow.tags || [],
+      settings: workflow.settings || {},
     }, null, 2),
   };
 }

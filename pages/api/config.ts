@@ -29,6 +29,9 @@ interface PowerNodeConfig {
   temperature?: number;
   maxTokens?: number;
 
+  // System Prompt
+  systemPrompt?: string;
+
   // MCP Tool Custom Prompts (stored as JSON string)
   customPrompts?: string;
 
@@ -80,6 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           defaultProvider: entity.defaultProvider || 'anthropic',
           temperature: entity.temperature ?? 0.7,
           maxTokens: entity.maxTokens ?? 4096,
+          systemPrompt: entity.systemPrompt || '',
           customPrompts,
         };
 
@@ -92,6 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             defaultProvider: 'anthropic',
             temperature: 0.7,
             maxTokens: 4096,
+            systemPrompt: '',
             customPrompts: {},
           });
         }
