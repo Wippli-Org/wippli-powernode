@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const MCP_TABLE_NAME = 'powernodeMcpServers';
-    const creatorId = 'default';
+    const creatorId = 'default-user';
     const mcpTableClient = TableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, MCP_TABLE_NAME);
 
     const mcpServers: any[] = [];

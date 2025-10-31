@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const POWERNODE_STORAGE_CONNECTION =
       process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
     const TABLE_NAME = 'powernodeconfig';
-    const creatorId = 'default';
+    const creatorId = 'default-user';
 
     if (!POWERNODE_STORAGE_CONNECTION) {
       throw new Error('Storage connection not configured');
