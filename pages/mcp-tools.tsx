@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Server, CheckCircle, AlertCircle, Play, FileJson, Download, Plus,
-  Settings, Zap, Clock, Activity, X
+  Settings, Zap, Clock, Activity, X, Edit2, Trash2
 } from 'lucide-react';
 
 interface MCPTool {
@@ -63,9 +63,11 @@ export default function MCPToolsPage() {
   const [testResult, setTestResult] = useState<string>('');
   const [testing, setTesting] = useState(false);
   const [showAddServer, setShowAddServer] = useState(false);
+  const [showEditServer, setShowEditServer] = useState(false);
+  const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Add Server Form State
+  // Add/Edit Server Form State
   const [newServerName, setNewServerName] = useState('');
   const [newServerDescription, setNewServerDescription] = useState('');
   const [newServerUrl, setNewServerUrl] = useState('');
@@ -99,6 +101,31 @@ export default function MCPToolsPage() {
 
     fetchServers();
   }, []);
+
+  // Listen for localStorage events (cross-page sync)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'mcp-servers-updated') {
+        // Refetch servers when they change
+        fetch('/api/mcp/servers')
+          .then(res => res.json())
+          .then(data => {
+            if (data.servers) {
+              setMcpServers(data.servers);
+            }
+          })
+          .catch(err => console.error('Failed to reload MCP servers:', err));
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Helper to trigger sync across pages
+  const triggerSync = () => {
+    localStorage.setItem('mcp-servers-updated', Date.now().toString());
+  };
 
   useEffect(() => {
     if (selectedServer && selectedServer.tools.length > 0 && !selectedTool) {
@@ -244,6 +271,9 @@ export default function MCPToolsPage() {
         setSelectedServer(newServer);
         setShowAddServer(false);
 
+        // Trigger sync to other pages (workflows, chat)
+        triggerSync();
+
         // Reset form
         setNewServerName('');
         setNewServerDescription('');
@@ -267,6 +297,137 @@ export default function MCPToolsPage() {
     setNewServerDescription('');
     setNewServerUrl('');
     setNewServerApiKey('');
+  };
+
+  const handleEditServer = (server: MCPServer, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Pre-fill form with server data
+    setEditingServer(server);
+    setNewServerName(server.name);
+    setNewServerDescription(server.description);
+    setNewServerUrl(server.url);
+    setNewServerApiKey(server.apiKey || '');
+    setShowEditServer(true);
+  };
+
+  const handleSaveEditServer = async () => {
+    if (!editingServer || !newServerName || !newServerUrl) {
+      alert('Please fill in server name and URL');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/mcp/servers', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingServer.id,
+          name: newServerName,
+          description: newServerDescription,
+          url: newServerUrl,
+          apiKey: newServerApiKey || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setMcpServers(prevServers =>
+          prevServers.map(s =>
+            s.id === editingServer.id
+              ? {
+                  ...s,
+                  name: newServerName,
+                  description: newServerDescription,
+                  url: newServerUrl,
+                  apiKey: newServerApiKey || undefined,
+                }
+              : s
+          )
+        );
+
+        // Update selected server if it was the one being edited
+        if (selectedServer?.id === editingServer.id) {
+          setSelectedServer({
+            ...selectedServer,
+            name: newServerName,
+            description: newServerDescription,
+            url: newServerUrl,
+            apiKey: newServerApiKey || undefined,
+          });
+        }
+
+        setShowEditServer(false);
+        setEditingServer(null);
+
+        // Trigger sync to other pages
+        triggerSync();
+
+        // Reset form
+        setNewServerName('');
+        setNewServerDescription('');
+        setNewServerUrl('');
+        setNewServerApiKey('');
+      } else {
+        const error = await response.json();
+        alert(`Failed to update server: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error updating server:', error);
+      alert(`Error updating server: ${error.message}`);
+    }
+  };
+
+  const handleCancelEditServer = () => {
+    setShowEditServer(false);
+    setEditingServer(null);
+
+    // Reset form
+    setNewServerName('');
+    setNewServerDescription('');
+    setNewServerUrl('');
+    setNewServerApiKey('');
+  };
+
+  const handleDeleteServer = async (server: MCPServer, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!confirm(`Are you sure you want to delete "${server.name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/mcp/servers', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: server.id,
+        }),
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setMcpServers(prevServers => prevServers.filter(s => s.id !== server.id));
+
+        // Clear selection if deleted server was selected
+        if (selectedServer?.id === server.id) {
+          setSelectedServer(mcpServers.length > 1 ? mcpServers[0] : null);
+        }
+
+        // Trigger sync to other pages
+        triggerSync();
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete server: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error deleting server:', error);
+      alert(`Error deleting server: ${error.message}`);
+    }
   };
 
   return (
@@ -319,17 +480,36 @@ export default function MCPToolsPage() {
                       <Server className="w-5 h-5 text-primary" />
                       <h3 className="font-semibold text-gray-900">{server.name}</h3>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {server.status === 'healthy' ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-yellow-600" />
-                      )}
-                      <span className={`text-xs font-medium ${
-                        server.status === 'healthy' ? 'text-green-600' : 'text-yellow-600'
-                      }`}>
-                        {server.status === 'healthy' ? 'Healthy' : 'Degraded'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      {/* Edit and Delete buttons */}
+                      <button
+                        onClick={(e) => handleEditServer(server, e)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title="Edit server"
+                      >
+                        <Edit2 className="w-4 h-4 text-gray-600 hover:text-primary" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteServer(server, e)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title="Delete server"
+                      >
+                        <Trash2 className="w-4 h-4 text-gray-600 hover:text-red-600" />
+                      </button>
+
+                      {/* Status indicator */}
+                      <div className="flex items-center gap-1 ml-2">
+                        {server.status === 'healthy' ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-yellow-600" />
+                        )}
+                        <span className={`text-xs font-medium ${
+                          server.status === 'healthy' ? 'text-green-600' : 'text-yellow-600'
+                        }`}>
+                          {server.status === 'healthy' ? 'Healthy' : 'Degraded'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -581,6 +761,93 @@ export default function MCPToolsPage() {
                   className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   Add Server
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit MCP Server Modal */}
+      {showEditServer && editingServer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Edit MCP Server</h3>
+              <button
+                onClick={handleCancelEditServer}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Server Name *
+                </label>
+                <input
+                  type="text"
+                  value={newServerName}
+                  onChange={(e) => setNewServerName(e.target.value)}
+                  placeholder="e.g., n8n Workflow MCP"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={newServerDescription}
+                  onChange={(e) => setNewServerDescription(e.target.value)}
+                  placeholder="e.g., Execute n8n workflows via MCP"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Server URL *
+                </label>
+                <input
+                  type="text"
+                  value={newServerUrl}
+                  onChange={(e) => setNewServerUrl(e.target.value)}
+                  placeholder="e.g., https://n8n.example.com/mcp"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API Key (Optional)
+                </label>
+                <input
+                  type="password"
+                  value={newServerApiKey}
+                  onChange={(e) => setNewServerApiKey(e.target.value)}
+                  placeholder="Bearer token or API key for authentication"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave blank to keep existing API key</p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleCancelEditServer}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEditServer}
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Save Changes
                 </button>
               </div>
             </div>
