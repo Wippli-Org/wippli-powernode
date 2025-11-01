@@ -67,6 +67,8 @@ export default function MCPToolsPage() {
   const [showEditServer, setShowEditServer] = useState(false);
   const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAddTool, setShowAddTool] = useState(false);
+  const [addingToolToServer, setAddingToolToServer] = useState<MCPServer | null>(null);
 
   // Add/Edit Server Form State
   const [newServerName, setNewServerName] = useState('');
@@ -74,6 +76,11 @@ export default function MCPToolsPage() {
   const [newServerUrl, setNewServerUrl] = useState('');
   const [newServerApiKey, setNewServerApiKey] = useState('');
   const [newServerTools, setNewServerTools] = useState('[]');
+
+  // Add Tool Form State
+  const [newToolName, setNewToolName] = useState('');
+  const [newToolDescription, setNewToolDescription] = useState('');
+  const [newToolSchema, setNewToolSchema] = useState('{\n  "type": "object",\n  "properties": {},\n  "required": []\n}');
 
   // Fetch servers on page load
   useEffect(() => {
@@ -453,6 +460,96 @@ export default function MCPToolsPage() {
     }
   };
 
+  const handleAddTool = async () => {
+    if (!addingToolToServer || !newToolName || !newToolDescription) {
+      alert('Please fill in tool name and description');
+      return;
+    }
+
+    // Parse and validate schema JSON
+    let parsedSchema;
+    try {
+      parsedSchema = JSON.parse(newToolSchema);
+    } catch (error) {
+      alert('Invalid JSON in Input Schema field');
+      return;
+    }
+
+    try {
+      const newTool: MCPTool = {
+        name: newToolName,
+        description: newToolDescription,
+        inputSchema: parsedSchema,
+        lastUsed: 'Never',
+      };
+
+      // Update tools array for the server
+      const updatedTools = [...(addingToolToServer.tools || []), newTool];
+
+      // Call API to update server with new tool
+      const response = await fetch('/api/mcp/servers', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: addingToolToServer.id,
+          name: addingToolToServer.name,
+          description: addingToolToServer.description,
+          url: addingToolToServer.url,
+          apiKey: addingToolToServer.apiKey || undefined,
+          tools: updatedTools,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setMcpServers(prevServers =>
+          prevServers.map(s =>
+            s.id === addingToolToServer.id
+              ? { ...s, tools: updatedTools }
+              : s
+          )
+        );
+
+        // Update selected server if it was the one being modified
+        if (selectedServer?.id === addingToolToServer.id) {
+          setSelectedServer({
+            ...selectedServer,
+            tools: updatedTools,
+          });
+        }
+
+        setShowAddTool(false);
+        setAddingToolToServer(null);
+
+        // Trigger sync to other pages
+        triggerSync();
+
+        // Reset form
+        setNewToolName('');
+        setNewToolDescription('');
+        setNewToolSchema('{\n  "type": "object",\n  "properties": {},\n  "required": []\n}');
+      } else {
+        const error = await response.json();
+        alert(`Failed to add tool: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error adding tool:', error);
+      alert(`Error adding tool: ${error.message}`);
+    }
+  };
+
+  const handleCancelAddTool = () => {
+    setShowAddTool(false);
+    setAddingToolToServer(null);
+
+    // Reset form
+    setNewToolName('');
+    setNewToolDescription('');
+    setNewToolSchema('{\n  "type": "object",\n  "properties": {},\n  "required": []\n}');
+  };
+
   if (loading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -563,9 +660,22 @@ export default function MCPToolsPage() {
 
                   {/* Tools List */}
                   <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="text-xs font-semibold text-gray-700 mb-2">
-                      Available Tools ({server.tools?.length || 0})
-                    </h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-semibold text-gray-700">
+                        Available Tools ({server.tools?.length || 0})
+                      </h4>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddingToolToServer(server);
+                          setShowAddTool(true);
+                        }}
+                        className="p-1 hover:bg-primary/10 rounded transition-colors"
+                        title="Add new tool"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-primary" />
+                      </button>
+                    </div>
                     <div className="space-y-2">
                       {(server.tools || []).map((tool) => (
                         <div
@@ -902,6 +1012,102 @@ export default function MCPToolsPage() {
                   className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Tool Modal */}
+      {showAddTool && addingToolToServer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Add New Tool to {addingToolToServer.name}
+              </h3>
+              <button
+                onClick={handleCancelAddTool}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tool Name *
+                </label>
+                <input
+                  type="text"
+                  value={newToolName}
+                  onChange={(e) => setNewToolName(e.target.value)}
+                  placeholder="e.g., get_node_code"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Unique identifier for this tool (use snake_case)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description *
+                </label>
+                <textarea
+                  value={newToolDescription}
+                  onChange={(e) => setNewToolDescription(e.target.value)}
+                  placeholder="e.g., Extract JavaScript code from a specific Code node in an n8n workflow"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Clear description of what this tool does</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Input Schema (JSON) *
+                </label>
+                <textarea
+                  value={newToolSchema}
+                  onChange={(e) => setNewToolSchema(e.target.value)}
+                  placeholder={`{\n  "type": "object",\n  "properties": {\n    "paramName": {\n      "type": "string",\n      "description": "Parameter description"\n    }\n  },\n  "required": ["paramName"]\n}`}
+                  rows={12}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">JSON schema defining the tool's input parameters</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="text-sm font-semibold text-blue-900 mb-1">Example Tool Schema</h4>
+                <pre className="text-xs text-blue-700 overflow-x-auto">{`{
+  "type": "object",
+  "properties": {
+    "workflowId": {
+      "type": "string",
+      "description": "The workflow ID"
+    },
+    "nodeName": {
+      "type": "string",
+      "description": "Name of the Code node"
+    }
+  },
+  "required": ["workflowId", "nodeName"]
+}`}</pre>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleCancelAddTool}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddTool}
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Add Tool
                 </button>
               </div>
             </div>
