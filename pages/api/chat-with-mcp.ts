@@ -190,15 +190,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stopReason: data.stop_reason,
     });
 
-    // Handle tool use
+    // Handle tool use with AGENTIC LOOP - allow multiple rounds of tool calls
     let reply = '';
-    let toolResults: any[] = [];
+    let currentMessages = messages;
+    let currentResponse = data;
+    let iteration = 0;
+    const MAX_ITERATIONS = 5; // Prevent infinite loops
 
-    if (data.stop_reason === 'tool_use') {
-      addLog('INFO', 'Tool Router', 'AI requested tool execution');
+    // Keep calling tools until Claude stops requesting them or we hit max iterations
+    while (currentResponse.stop_reason === 'tool_use' && iteration < MAX_ITERATIONS) {
+      iteration++;
+      addLog('INFO', 'Tool Router', `AI requested tool execution (iteration ${iteration}/${MAX_ITERATIONS})`);
+
+      let toolResults: any[] = [];
 
       // Find all tool_use content blocks
-      const toolUseBlocks = data.content.filter((block: any) => block.type === 'tool_use');
+      const toolUseBlocks = currentResponse.content.filter((block: any) => block.type === 'tool_use');
 
       for (const toolUse of toolUseBlocks) {
         const toolName = toolUse.name;
@@ -270,9 +277,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Continue conversation with tool results
       addLog('INFO', 'AI Provider', 'Sending tool results back to AI');
 
-      const continuationMessages = [
-        ...messages,
-        { role: 'assistant', content: data.content },
+      currentMessages = [
+        ...currentMessages,
+        { role: 'assistant', content: currentResponse.content },
         { role: 'user', content: toolResults },
       ];
 
@@ -288,7 +295,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           model: providerConfig.model,
           max_tokens: config.maxTokens || 4096,
           temperature: config.temperature || 0.7,
-          messages: continuationMessages,
+          messages: currentMessages,
           tools: requestBody.tools,
         }),
       });
@@ -298,22 +305,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error(`AI API error on continuation: ${continuationResponse.status} - ${errorText}`);
       }
 
-      const continuationData = await continuationResponse.json();
+      currentResponse = await continuationResponse.json();
       const continuationDuration = Date.now() - continuationStartTime;
 
-      inputTokens += continuationData.usage.input_tokens;
-      outputTokens += continuationData.usage.output_tokens;
+      inputTokens += currentResponse.usage.input_tokens;
+      outputTokens += currentResponse.usage.output_tokens;
 
-      addLog('SUCCESS', providerConfig.model, `Final response received (${continuationDuration}ms)`, {
-        inputTokens: continuationData.usage.input_tokens,
-        outputTokens: continuationData.usage.output_tokens,
+      addLog('SUCCESS', providerConfig.model, `Continuation response received (${continuationDuration}ms)`, {
+        inputTokens: currentResponse.usage.input_tokens,
+        outputTokens: currentResponse.usage.output_tokens,
+        stopReason: currentResponse.stop_reason,
       });
-
-      reply = continuationData.content.find((block: any) => block.type === 'text')?.text || '';
-    } else {
-      // No tool use - extract text response
-      reply = data.content.find((block: any) => block.type === 'text')?.text || '';
     }
+
+    // Check if we hit max iterations
+    if (iteration >= MAX_ITERATIONS && currentResponse.stop_reason === 'tool_use') {
+      addLog('WARN', 'Tool Router', `Reached max iterations (${MAX_ITERATIONS}), stopping agentic loop`);
+    }
+
+    // Extract final text response
+    reply = currentResponse.content.find((block: any) => block.type === 'text')?.text || '';
 
     // Calculate REAL cost
     const cost = ((inputTokens * 3 / 1000000) + (outputTokens * 15 / 1000000)).toFixed(4);
