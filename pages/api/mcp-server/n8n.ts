@@ -356,6 +356,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         result = await searchWorkflows(n8nApiKey, toolArgs);
       }
 
+      // Custom Tools (dynamically added via UI)
+      else if (name === 'get_node_code') {
+        result = await getNodeCode(n8nApiKey, toolArgs.workflowId, toolArgs.nodeName);
+      }
+
       else {
         return res.status(200).json({
           jsonrpc: '2.0',
@@ -936,6 +941,70 @@ async function getNodeTypes(apiKey: string) {
         outputs: type.outputs,
       })),
       count: data.data.length,
+    }, null, 2),
+  };
+}
+
+// ============================================================================
+// CUSTOM TOOLS (Added via UI)
+// ============================================================================
+
+async function getNodeCode(apiKey: string, workflowId: string, nodeName: string) {
+  // First get the full workflow details
+  const response = await fetch(`${N8N_API_URL}/workflows/${workflowId}`, {
+    headers: {
+      'X-N8N-API-KEY': apiKey,
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`n8n API error: ${response.status} ${response.statusText}`);
+  }
+
+  const workflow = await response.json();
+
+  // Find the specific node by name
+  const node = workflow.nodes?.find((n: any) => n.name === nodeName);
+
+  if (!node) {
+    return {
+      content: JSON.stringify({
+        error: `Node "${nodeName}" not found in workflow ${workflowId}`,
+        availableNodes: workflow.nodes?.map((n: any) => n.name) || [],
+      }, null, 2),
+    };
+  }
+
+  // Extract code based on node type
+  let code = null;
+
+  if (node.type === 'n8n-nodes-base.code' || node.type.includes('Code')) {
+    // Code node - extract JavaScript code
+    code = node.parameters?.jsCode || node.parameters?.code || node.parameters?.javascriptCode;
+  } else if (node.type === 'n8n-nodes-base.function' || node.type.includes('Function')) {
+    // Function node - extract function code
+    code = node.parameters?.functionCode || node.parameters?.code;
+  }
+
+  if (!code) {
+    return {
+      content: JSON.stringify({
+        error: `No code found in node "${nodeName}"`,
+        nodeType: node.type,
+        parameters: node.parameters,
+        hint: 'This node may not contain executable code, or the code parameter name is different.',
+      }, null, 2),
+    };
+  }
+
+  return {
+    content: JSON.stringify({
+      workflowId: workflowId,
+      workflowName: workflow.name,
+      nodeName: nodeName,
+      nodeType: node.type,
+      code: code,
     }, null, 2),
   };
 }
