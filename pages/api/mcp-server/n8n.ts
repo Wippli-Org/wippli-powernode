@@ -451,8 +451,8 @@ async function getWorkflowDetails(apiKey: string, workflowId: string) {
     throw new Error(`n8n API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
-  const workflow = data.data;
+  const workflow = await response.json();
+  // n8n API returns workflow directly at root level, not under data.data
 
   // Extract node information
   const nodes = workflow.nodes?.map((node: any) => ({
