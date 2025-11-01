@@ -235,14 +235,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const toolDuration = Date.now() - toolStartTime;
 
           if (toolData.success) {
+            // MCP tools return {content: "..."} format - extract the content field
+            const toolResultContent = toolData.result?.content || JSON.stringify(toolData.result);
+
             addLog('SUCCESS', 'MCP Executor', `Tool executed successfully (${toolDuration}ms)`, {
-              result: typeof toolData.result === 'string' ? toolData.result.substring(0, 100) : toolData.result,
+              result: typeof toolResultContent === 'string' ? toolResultContent.substring(0, 100) : toolResultContent,
             });
 
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUseId,
-              content: JSON.stringify(toolData.result),
+              content: toolResultContent,
             });
           } else {
             addLog('ERROR', 'MCP Executor', `Tool execution failed: ${toolData.error}`);
