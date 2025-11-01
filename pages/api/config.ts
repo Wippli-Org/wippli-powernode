@@ -106,14 +106,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Save configuration
       const body = req.body;
 
+      // Load existing config to preserve unmasked API keys
+      let existingProviders = {};
+      try {
+        const existingEntity = await tableClient.getEntity<PowerNodeConfig>(creatorId, 'config');
+        existingProviders = existingEntity.providers ? JSON.parse(existingEntity.providers) : {};
+      } catch (error: any) {
+        // No existing config, that's okay
+        if (error.statusCode !== 404) {
+          console.error('Error loading existing config:', error);
+        }
+      }
+
+      // Merge providers, preserving unmasked API keys when masked values are submitted
+      const updatedProviders: any = {};
+      for (const [providerKey, providerData] of Object.entries(body.providers || {})) {
+        const provider = providerData as any;
+        const existingProvider = (existingProviders as any)[providerKey] || {};
+
+        // Check if the API key is masked (contains *** or is empty)
+        const isApiKeyMasked = !provider.apiKey || provider.apiKey.includes('***');
+
+        updatedProviders[providerKey] = {
+          ...provider,
+          // Preserve existing unmasked key if submitted key is masked
+          apiKey: isApiKeyMasked ? (existingProvider.apiKey || '') : provider.apiKey,
+        };
+      }
+
       // Prepare entity for Table Storage
       const entity: PowerNodeConfig = {
         partitionKey: creatorId,
         rowKey: 'config',
-        providers: JSON.stringify(body.providers || {}),
+        providers: JSON.stringify(updatedProviders),
         defaultProvider: body.defaultProvider || 'anthropic',
         temperature: body.temperature ?? 0.7,
         maxTokens: body.maxTokens ?? 4096,
+        systemPrompt: body.systemPrompt || '',
         customPrompts: JSON.stringify(body.customPrompts || {}),
         updatedAt: new Date().toISOString(),
       };
