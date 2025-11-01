@@ -195,6 +195,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let currentMessages = messages;
     let currentResponse = data;
     let iteration = 0;
+    let totalToolExecutions = 0; // Track total number of tool calls across all iterations
     const MAX_ITERATIONS = 5; // Prevent infinite loops
 
     // Keep calling tools until Claude stops requesting them or we hit max iterations
@@ -254,6 +255,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               tool_use_id: toolUseId,
               content: toolResultContent,
             });
+            totalToolExecutions++; // Count successful tool execution
           } else {
             addLog('ERROR', 'MCP Executor', `Tool execution failed: ${toolData.error}`);
             toolResults.push({
@@ -364,7 +366,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens },
         cost: parseFloat(cost),
         duration: Date.now() - startTime,
-        mcpToolsExecuted: toolResults.length,
+        mcpToolsExecuted: totalToolExecutions,
         toolsAvailable: tools.length,
       },
     });
