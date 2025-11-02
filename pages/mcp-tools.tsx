@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Server, CheckCircle, AlertCircle, Play, FileJson, Download, Plus,
-  Settings, Zap, Clock, Activity, X, Edit2, Trash2
+  Settings, Zap, Clock, Activity, X, Edit2, Trash2, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 interface MCPTool {
@@ -69,6 +69,7 @@ export default function MCPToolsPage() {
   const [loading, setLoading] = useState(true);
   const [showAddTool, setShowAddTool] = useState(false);
   const [addingToolToServer, setAddingToolToServer] = useState<MCPServer | null>(null);
+  const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
 
   // Add/Edit Server Form State
   const [newServerName, setNewServerName] = useState('');
@@ -550,6 +551,19 @@ export default function MCPToolsPage() {
     setNewToolSchema('{\n  "type": "object",\n  "properties": {},\n  "required": []\n}');
   };
 
+  const toggleServerExpanded = (serverId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedServers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(serverId)) {
+        newSet.delete(serverId);
+      } else {
+        newSet.add(serverId);
+      }
+      return newSet;
+    });
+  };
+
   if (loading) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
@@ -661,9 +675,19 @@ export default function MCPToolsPage() {
                   {/* Tools List */}
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-semibold text-gray-700">
-                        Available Tools ({server.tools?.length || 0})
-                      </h4>
+                      <button
+                        onClick={(e) => toggleServerExpanded(server.id, e)}
+                        className="flex items-center gap-2 hover:bg-gray-50 rounded px-2 py-1 transition-colors flex-1 text-left"
+                      >
+                        <h4 className="text-xs font-semibold text-gray-700">
+                          Available Tools ({server.tools?.length || 0})
+                        </h4>
+                        {expandedServers.has(server.id) ? (
+                          <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        )}
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -676,8 +700,9 @@ export default function MCPToolsPage() {
                         <Plus className="w-3.5 h-3.5 text-primary" />
                       </button>
                     </div>
-                    <div className="space-y-2">
-                      {(server.tools || []).map((tool) => (
+                    {expandedServers.has(server.id) && (
+                      <div className="space-y-2">
+                        {(server.tools || []).map((tool) => (
                         <div
                           key={tool.name}
                           onClick={(e) => {
@@ -700,7 +725,8 @@ export default function MCPToolsPage() {
                           </div>
                         </div>
                       ))}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
