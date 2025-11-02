@@ -885,7 +885,7 @@ async function createFromTemplate(args: any): Promise<string> {
   const newBuffer = await workbook.xlsx.writeBuffer();
 
   const targetBlobClient = containerClient.getBlockBlobClient(targetWorkbookFilename);
-  await targetBlobClient.uploadData(newBuffer as Buffer, {
+  await targetBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -937,7 +937,7 @@ async function addWorksheet(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -974,7 +974,7 @@ async function deleteWorksheet(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1011,7 +1011,7 @@ async function renameWorksheet(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1080,7 +1080,7 @@ async function writeCell(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1131,7 +1131,7 @@ async function writeRange(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1257,7 +1257,7 @@ async function appendRow(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1294,7 +1294,7 @@ async function insertRow(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1354,7 +1354,7 @@ async function formatCells(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
@@ -1398,7 +1398,7 @@ async function addFormula(args: any): Promise<string> {
 
   const newBuffer = await workbook.xlsx.writeBuffer();
 
-  await blockBlobClient.uploadData(newBuffer as Buffer, {
+  await blockBlobClient.uploadData(newBuffer as any, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
