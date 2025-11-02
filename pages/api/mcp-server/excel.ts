@@ -659,7 +659,7 @@ async function readWorkbook(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const result: any = {
     filename: workbookFilename,
@@ -860,7 +860,7 @@ async function createFromTemplate(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   // Replace variables if provided
   if (variables) {
@@ -931,7 +931,7 @@ async function addWorksheet(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   workbook.addWorksheet(sheetName);
 
@@ -963,7 +963,7 @@ async function deleteWorksheet(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1000,7 +1000,7 @@ async function renameWorksheet(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(oldName);
   if (!worksheet) {
@@ -1037,7 +1037,7 @@ async function listWorksheets(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheets: any[] = [];
   workbook.eachSheet((worksheet) => {
@@ -1069,7 +1069,7 @@ async function writeCell(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1106,7 +1106,7 @@ async function writeRange(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1157,7 +1157,7 @@ async function readCell(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1190,7 +1190,7 @@ async function readRange(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1246,7 +1246,7 @@ async function appendRow(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1283,7 +1283,7 @@ async function insertRow(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1321,7 +1321,7 @@ async function formatCells(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
@@ -1386,7 +1386,7 @@ async function addFormula(args: any): Promise<string> {
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(buffer as any);
 
   const worksheet = workbook.getWorksheet(sheetName);
   if (!worksheet) {
