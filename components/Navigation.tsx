@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Home, MessageSquare, Settings, Server, FileText, Workflow } from 'lucide-react';
+import { Home, MessageSquare, Settings, Server, FileText, Workflow, HardDrive } from 'lucide-react';
 
 export default function Navigation() {
   const router = useRouter();
@@ -10,6 +10,7 @@ export default function Navigation() {
     { href: '/chat', label: 'Chat', icon: MessageSquare },
     { href: '/config', label: 'Agent', icon: Settings },
     { href: '/mcp-tools', label: 'MCP Tools', icon: Server },
+    { href: '/storage', label: 'Storage', icon: HardDrive },
     { href: '/logs', label: 'Logs', icon: FileText },
     { href: '/workflows', label: 'Workflows', icon: Workflow },
   ];
