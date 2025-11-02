@@ -13,10 +13,10 @@ import {
   WidthType,
   BorderStyle,
   ImageRun,
-  Hyperlink,
   PageBreak,
   TableOfContents,
-  UnderlineType
+  UnderlineType,
+  ExternalHyperlink
 } from 'docx';
 import { TableClient } from '@azure/data-tables';
 
@@ -1393,8 +1393,9 @@ async function addImage(args: any): Promise<string> {
           transformation: {
             width: width || 600,
             height: height || 400
-          }
-        })
+          },
+          type: 'png' // Specify image type
+        } as any) // Type assertion for compatibility
       ]
     })
   );
