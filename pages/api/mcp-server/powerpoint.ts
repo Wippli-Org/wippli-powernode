@@ -1101,7 +1101,7 @@ async function addChart(args: any): Promise<string> {
     title: options?.title || 'Chart'
   };
 
-  slide.addChart(pptx.ChartType[chartType as keyof typeof pptx.ChartType] || pptx.ChartType.bar, data, chartOptions);
+  slide.addChart((pptx.ChartType[chartType as keyof typeof pptx.ChartType] || pptx.ChartType.bar) as any, data, chartOptions);
 
   const base64 = await pptx.write({ outputType: 'base64' });
   const buffer = Buffer.from(base64 as string, 'base64');
