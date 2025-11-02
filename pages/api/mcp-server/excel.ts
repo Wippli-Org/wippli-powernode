@@ -633,7 +633,7 @@ async function createWorkbook(args: any): Promise<string> {
   const containerClient = blobClient.getContainerClient(containerName);
   const blockBlobClient = containerClient.getBlockBlobClient(workbookFilename);
 
-  await blockBlobClient.uploadData(buffer as Buffer, {
+  await blockBlobClient.uploadData(Buffer.from(buffer), {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
