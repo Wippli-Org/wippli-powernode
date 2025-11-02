@@ -17,14 +17,13 @@ COPY ./build ./
 # Install PM2 for process management
 RUN npm install -g pm2
 
-# Install Python MCP dependencies (only if directory exists)
-COPY mcp-servers/word/requirements.txt /app/mcp-servers/word/requirements.txt 2>/dev/null || true
+# Copy Python MCP server files (if they exist)
+COPY mcp-servers /app/mcp-servers
+
+# Install Python MCP dependencies
 RUN if [ -f /app/mcp-servers/word/requirements.txt ]; then \
       pip3 install --break-system-packages --no-cache-dir -r /app/mcp-servers/word/requirements.txt; \
     fi
-
-# Copy Python MCP server
-COPY mcp-servers /app/mcp-servers 2>/dev/null || true
 
 ENV HOSTNAME="0.0.0.0"
 ENV NODE_ENV=production
