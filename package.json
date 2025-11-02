@@ -12,10 +12,13 @@
     "pre-deploy": "npm run type-check && npm run build"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
     "@azure/data-tables": "^13.3.1",
-    "@azure/storage-blob": "^12.23.0",
+    "@azure/storage-blob": "^12.29.1",
     "date-fns": "^3.3.1",
+    "docx": "^9.5.1",
     "lucide-react": "^0.344.0",
+    "mammoth": "^1.11.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
