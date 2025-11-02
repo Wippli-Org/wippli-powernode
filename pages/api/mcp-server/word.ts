@@ -25,7 +25,7 @@ import { TableClient } from '@azure/data-tables';
  *
  * Following n8n MCP pattern - no child processes, clean JSON-RPC 2.0
  *
- * COMPREHENSIVE 20-TOOL SUITE:
+ * COMPREHENSIVE 24-TOOL SUITE:
  *
  * DOCUMENT MANAGEMENT:
  * 1. create_document - Create new Word documents
@@ -35,27 +35,33 @@ import { TableClient } from '@azure/data-tables';
  * 5. get_document_url - Get temporary download URLs (1 hour expiry)
  * 6. copy_document - Copy/duplicate a document
  *
+ * TEMPLATE MANAGEMENT:
+ * 7. upload_template - Upload a Word template to blob storage
+ * 8. list_templates - List all available templates
+ * 9. create_from_template - Create document from template with variable substitution
+ * 10. delete_template - Delete a template from storage
+ *
  * CONTENT EDITING:
- * 7. add_paragraph - Add paragraphs with various formatting
- * 8. add_heading - Add headings (H1-H6)
- * 9. add_list - Add bulleted or numbered lists
- * 10. add_table - Create and populate tables
- * 11. update_field - Find and replace specific text
- * 12. insert_page_break - Insert page breaks
+ * 11. add_paragraph - Add paragraphs with various formatting
+ * 12. add_heading - Add headings (H1-H6)
+ * 13. add_list - Add bulleted or numbered lists
+ * 14. add_table - Create and populate tables
+ * 15. update_field - Find and replace specific text
+ * 16. insert_page_break - Insert page breaks
  *
  * FORMATTING:
- * 13. format_text - Apply bold, italic, underline, color formatting to text
- * 14. set_paragraph_alignment - Set alignment (left, center, right, justify)
+ * 17. format_text - Apply bold, italic, underline, color formatting to text
+ * 18. set_paragraph_alignment - Set alignment (left, center, right, justify)
  *
  * ADVANCED FEATURES:
- * 15. add_image - Insert images from URLs or blob storage
- * 16. add_hyperlink - Add clickable hyperlinks
- * 17. add_table_of_contents - Insert table of contents
- * 18. merge_documents - Combine multiple documents
+ * 19. add_image - Insert images from URLs or blob storage
+ * 20. add_hyperlink - Add clickable hyperlinks
+ * 21. add_table_of_contents - Insert table of contents
+ * 22. merge_documents - Combine multiple documents
  *
  * AI-POWERED:
- * 19. analyze_questionnaire - AI-powered questionnaire analysis (uses configured model from /config)
- * 20. extract_data - AI-powered data extraction from documents
+ * 23. analyze_questionnaire - AI-powered questionnaire analysis (uses configured model from /config)
+ * 24. extract_data - AI-powered data extraction from documents
  */
 
 // Initialize clients (lazy loaded)
@@ -227,6 +233,70 @@ const TOOLS = [
         }
       },
       required: ['sourceFilename', 'targetFilename']
+    }
+  },
+
+  // TEMPLATE MANAGEMENT
+  {
+    name: 'upload_template',
+    description: 'Upload a Word template to blob storage in the templates/ folder',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateName: {
+          type: 'string',
+          description: 'Template name (without .docx extension)'
+        },
+        sourceFilename: {
+          type: 'string',
+          description: 'Source document filename to use as template'
+        }
+      },
+      required: ['templateName', 'sourceFilename']
+    }
+  },
+  {
+    name: 'list_templates',
+    description: 'List all available Word templates',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'create_from_template',
+    description: 'Create a new document from a template with variable substitution (replaces {{variableName}} placeholders)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateName: {
+          type: 'string',
+          description: 'Template name (without .docx extension)'
+        },
+        targetFilename: {
+          type: 'string',
+          description: 'New document filename (without .docx extension)'
+        },
+        variables: {
+          type: 'object',
+          description: 'Key-value pairs for template variable substitution (e.g., {"companyName": "Acme Corp", "date": "2025-01-01"})'
+        }
+      },
+      required: ['templateName', 'targetFilename']
+    }
+  },
+  {
+    name: 'delete_template',
+    description: 'Delete a Word template from storage',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateName: {
+          type: 'string',
+          description: 'Template name (without .docx extension)'
+        }
+      },
+      required: ['templateName']
     }
   },
 
@@ -731,6 +801,132 @@ async function copyDocument(args: any): Promise<string> {
   await targetBlobClient.beginCopyFromURL(sourceBlobClient.url);
 
   return `Document copied from ${sourceDocFilename} to ${targetDocFilename}`;
+}
+
+// TEMPLATE FUNCTIONS
+
+async function uploadTemplate(args: any): Promise<string> {
+  const { templateName, sourceFilename } = args;
+  const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
+  const templateDocFilename = templateName.endsWith('.docx') ? templateName : `${templateName}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+
+  const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+  const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+
+  // Check if source exists
+  const exists = await sourceBlobClient.exists();
+  if (!exists) {
+    throw new Error(`Source document ${sourceDocFilename} not found`);
+  }
+
+  // Copy to templates folder
+  await templateBlobClient.beginCopyFromURL(sourceBlobClient.url);
+
+  return `Template ${templateDocFilename} uploaded to templates/ folder`;
+}
+
+async function listTemplates(args: any): Promise<string> {
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+
+  const templates: any[] = [];
+
+  for await (const blob of containerClient.listBlobsFlat({ prefix: 'templates/' })) {
+    if (blob.name.endsWith('.docx')) {
+      templates.push({
+        name: blob.name.replace('templates/', ''),
+        size: blob.properties.contentLength,
+        lastModified: blob.properties.lastModified
+      });
+    }
+  }
+
+  return JSON.stringify(templates, null, 2);
+}
+
+async function createFromTemplate(args: any): Promise<string> {
+  const { templateName, targetFilename, variables } = args;
+  const templateDocFilename = templateName.endsWith('.docx') ? templateName : `${templateName}.docx`;
+  const targetDocFilename = targetFilename.endsWith('.docx') ? targetFilename : `${targetFilename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+
+  // Download template
+  const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+  const exists = await templateBlobClient.exists();
+  if (!exists) {
+    throw new Error(`Template ${templateDocFilename} not found in templates/ folder`);
+  }
+
+  const downloadResponse = await templateBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download template');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse template with mammoth
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  let docText = result.value;
+
+  // Replace variables if provided
+  if (variables) {
+    for (const [key, value] of Object.entries(variables)) {
+      const placeholder = `{{${key}}}`;
+      docText = docText.replace(new RegExp(placeholder, 'g'), value as string);
+    }
+  }
+
+  // Create new document from template
+  const doc = new Document({
+    sections: [{
+      children: docText.split('\n').map(line =>
+        new Paragraph({ children: [new TextRun(line || ' ')] })
+      )
+    }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+  await targetBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Document ${targetDocFilename} created from template ${templateDocFilename}${variables ? ' with variable substitution' : ''}`;
+}
+
+async function deleteTemplate(args: any): Promise<string> {
+  const { templateName } = args;
+  const templateDocFilename = templateName.endsWith('.docx') ? templateName : `${templateName}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+
+  // Check if exists
+  const exists = await templateBlobClient.exists();
+  if (!exists) {
+    throw new Error(`Template ${templateDocFilename} not found in templates/ folder`);
+  }
+
+  // Delete
+  await templateBlobClient.delete();
+
+  return `Template ${templateDocFilename} deleted from templates/ folder`;
 }
 
 async function addParagraph(args: any): Promise<string> {
@@ -1526,6 +1722,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             break;
           case 'copy_document':
             result = await copyDocument(args);
+            break;
+
+          // Template Management
+          case 'upload_template':
+            result = await uploadTemplate(args);
+            break;
+          case 'list_templates':
+            result = await listTemplates(args || {});
+            break;
+          case 'create_from_template':
+            result = await createFromTemplate(args);
+            break;
+          case 'delete_template':
+            result = await deleteTemplate(args);
             break;
 
           // Content Editing
