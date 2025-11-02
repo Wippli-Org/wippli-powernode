@@ -2,18 +2,19 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { BlobServiceClient } from '@azure/storage-blob';
 import Anthropic from '@anthropic-ai/sdk';
 import { Document, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
+import { TableClient } from '@azure/data-tables';
 
 /**
  * Word MCP Server - Pure TypeScript Implementation
- * 
+ *
  * Following n8n MCP pattern - no child processes, clean JSON-RPC 2.0
- * 
+ *
  * 5 Core Tools:
  * 1. create_document - Create new Word documents
  * 2. read_document - Read and extract Word document content
  * 3. list_documents - List available .docx files
  * 4. add_paragraph - Add content to existing documents
- * 5. analyze_questionnaire - AI-powered questionnaire analysis
+ * 5. analyze_questionnaire - AI-powered questionnaire analysis (uses configured model from /config)
  */
 
 // Initialize clients (lazy loaded)
@@ -40,6 +41,39 @@ function getAnthropicClient() {
     anthropicClient = new Anthropic({ apiKey });
   }
   return anthropicClient;
+}
+
+// Fetch PowerNode configuration to get the selected AI model
+async function getPowerNodeConfig(): Promise<{ model: string; apiKey: string } | null> {
+  try {
+    const connectionString = process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+    if (!connectionString) {
+      console.error('No storage connection for config');
+      return null;
+    }
+
+    const tableClient = TableClient.fromConnectionString(connectionString, 'powernodeconfig');
+    const entity = await tableClient.getEntity('default-user', 'config');
+
+    // Parse providers JSON
+    const providers = entity.providers ? JSON.parse(entity.providers as string) : {};
+    const defaultProvider = entity.defaultProvider as string || 'anthropic';
+
+    // Get the selected provider's config
+    const providerConfig = providers[defaultProvider];
+    if (!providerConfig || !providerConfig.enabled) {
+      console.error(`Provider ${defaultProvider} not enabled`);
+      return null;
+    }
+
+    return {
+      model: providerConfig.model,
+      apiKey: providerConfig.apiKey
+    };
+  } catch (error) {
+    console.error('Error fetching PowerNode config:', error);
+    return null;
+  }
 }
 
 // Tool definitions (MCP protocol)
@@ -262,16 +296,22 @@ async function addParagraph(args: any): Promise<string> {
 
 async function analyzeQuestionnaire(args: any): Promise<string> {
   const { filename } = args;
-  
+
   // First, read the document
   const docContent = await readDocument({ filename });
   const parsedContent = JSON.parse(docContent);
 
-  // Use Claude AI to analyze
-  const anthropic = getAnthropicClient();
-  
+  // Get PowerNode config to use the selected model
+  const config = await getPowerNodeConfig();
+  if (!config) {
+    throw new Error('PowerNode configuration not found. Please configure your AI provider in /config');
+  }
+
+  // Use configured Anthropic client with the selected model
+  const anthropic = new Anthropic({ apiKey: config.apiKey });
+
   const response = await anthropic.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
+    model: config.model, // Dynamically use the model from /config (e.g., claude-3-5-haiku-20241022)
     max_tokens: 4000,
     messages: [{
       role: 'user',
@@ -290,7 +330,7 @@ ${parsedContent.text}`
   return JSON.stringify({
     filename,
     analysis,
-    analyzedBy: 'Claude 3.5 Sonnet'
+    analyzedBy: config.model
   }, null, 2);
 }
 
