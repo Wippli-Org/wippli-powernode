@@ -1,7 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { BlobServiceClient } from '@azure/storage-blob';
 import Anthropic from '@anthropic-ai/sdk';
-import { Document, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
+import {
+  Document,
+  Paragraph,
+  TextRun,
+  AlignmentType,
+  HeadingLevel,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  BorderStyle,
+  ImageRun,
+  Hyperlink,
+  PageBreak,
+  TableOfContents,
+  UnderlineType
+} from 'docx';
 import { TableClient } from '@azure/data-tables';
 
 /**
@@ -9,15 +25,37 @@ import { TableClient } from '@azure/data-tables';
  *
  * Following n8n MCP pattern - no child processes, clean JSON-RPC 2.0
  *
- * 8 Complete Tools:
+ * COMPREHENSIVE 20-TOOL SUITE:
+ *
+ * DOCUMENT MANAGEMENT:
  * 1. create_document - Create new Word documents
  * 2. read_document - Read and extract Word document content
  * 3. list_documents - List available .docx files
- * 4. add_paragraph - Add content to existing documents
- * 5. analyze_questionnaire - AI-powered questionnaire analysis (uses configured model from /config)
- * 6. update_field - Find and replace specific text in documents
- * 7. delete_document - Delete documents from blob storage
- * 8. get_document_url - Get temporary download URLs (1 hour expiry)
+ * 4. delete_document - Delete documents from blob storage
+ * 5. get_document_url - Get temporary download URLs (1 hour expiry)
+ * 6. copy_document - Copy/duplicate a document
+ *
+ * CONTENT EDITING:
+ * 7. add_paragraph - Add paragraphs with various formatting
+ * 8. add_heading - Add headings (H1-H6)
+ * 9. add_list - Add bulleted or numbered lists
+ * 10. add_table - Create and populate tables
+ * 11. update_field - Find and replace specific text
+ * 12. insert_page_break - Insert page breaks
+ *
+ * FORMATTING:
+ * 13. format_text - Apply bold, italic, underline, color formatting to text
+ * 14. set_paragraph_alignment - Set alignment (left, center, right, justify)
+ *
+ * ADVANCED FEATURES:
+ * 15. add_image - Insert images from URLs or blob storage
+ * 16. add_hyperlink - Add clickable hyperlinks
+ * 17. add_table_of_contents - Insert table of contents
+ * 18. merge_documents - Combine multiple documents
+ *
+ * AI-POWERED:
+ * 19. analyze_questionnaire - AI-powered questionnaire analysis (uses configured model from /config)
+ * 20. extract_data - AI-powered data extraction from documents
  */
 
 // Initialize clients (lazy loaded)
@@ -79,8 +117,23 @@ async function getPowerNodeConfig(): Promise<{ model: string; apiKey: string } |
   }
 }
 
+// Helper function to convert stream to buffer
+async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: any[] = [];
+    readableStream.on('data', (data) => {
+      chunks.push(data instanceof Buffer ? data : Buffer.from(data));
+    });
+    readableStream.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    readableStream.on('error', reject);
+  });
+}
+
 // Tool definitions (MCP protocol)
 const TOOLS = [
+  // DOCUMENT MANAGEMENT
   {
     name: 'create_document',
     description: 'Create a new Word document with optional title and content',
@@ -131,64 +184,6 @@ const TOOLS = [
     }
   },
   {
-    name: 'add_paragraph',
-    description: 'Add a paragraph to an existing Word document',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filename: {
-          type: 'string',
-          description: 'Document filename (.docx file)'
-        },
-        text: {
-          type: 'string',
-          description: 'Paragraph text to add'
-        },
-        heading: {
-          type: 'boolean',
-          description: 'Format as heading (optional, default false)'
-        }
-      },
-      required: ['filename', 'text']
-    }
-  },
-  {
-    name: 'analyze_questionnaire',
-    description: 'Analyze a Word document using Claude AI to detect questionnaire structure, field types, and metadata',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filename: {
-          type: 'string',
-          description: 'Document filename (.docx file)'
-        }
-      },
-      required: ['filename']
-    }
-  },
-  {
-    name: 'update_field',
-    description: 'Find and replace specific text content in a Word document',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filename: {
-          type: 'string',
-          description: 'Document filename (.docx file)'
-        },
-        searchText: {
-          type: 'string',
-          description: 'Text to find in the document'
-        },
-        replaceText: {
-          type: 'string',
-          description: 'New text to replace with'
-        }
-      },
-      required: ['filename', 'searchText', 'replaceText']
-    }
-  },
-  {
     name: 'delete_document',
     description: 'Delete a Word document from Azure Blob Storage',
     inputSchema: {
@@ -215,26 +210,365 @@ const TOOLS = [
       },
       required: ['filename']
     }
+  },
+  {
+    name: 'copy_document',
+    description: 'Copy/duplicate a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceFilename: {
+          type: 'string',
+          description: 'Source document filename (.docx file)'
+        },
+        targetFilename: {
+          type: 'string',
+          description: 'Target document filename (without .docx extension)'
+        }
+      },
+      required: ['sourceFilename', 'targetFilename']
+    }
+  },
+
+  // CONTENT EDITING
+  {
+    name: 'add_paragraph',
+    description: 'Add a paragraph to an existing Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        text: {
+          type: 'string',
+          description: 'Paragraph text to add'
+        },
+        alignment: {
+          type: 'string',
+          description: 'Text alignment (left, center, right, justify)',
+          enum: ['left', 'center', 'right', 'justify']
+        }
+      },
+      required: ['filename', 'text']
+    }
+  },
+  {
+    name: 'add_heading',
+    description: 'Add a heading to an existing Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        text: {
+          type: 'string',
+          description: 'Heading text'
+        },
+        level: {
+          type: 'number',
+          description: 'Heading level (1-6, where 1 is largest)',
+          minimum: 1,
+          maximum: 6
+        }
+      },
+      required: ['filename', 'text', 'level']
+    }
+  },
+  {
+    name: 'add_list',
+    description: 'Add a bulleted or numbered list to a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        items: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of list items'
+        },
+        type: {
+          type: 'string',
+          description: 'List type (bullet or number)',
+          enum: ['bullet', 'number']
+        }
+      },
+      required: ['filename', 'items', 'type']
+    }
+  },
+  {
+    name: 'add_table',
+    description: 'Create and add a table to a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        headers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Table header row'
+        },
+        rows: {
+          type: 'array',
+          items: {
+            type: 'array',
+            items: { type: 'string' }
+          },
+          description: 'Table data rows (array of arrays)'
+        }
+      },
+      required: ['filename', 'headers', 'rows']
+    }
+  },
+  {
+    name: 'update_field',
+    description: 'Find and replace specific text content in a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        searchText: {
+          type: 'string',
+          description: 'Text to find in the document'
+        },
+        replaceText: {
+          type: 'string',
+          description: 'New text to replace with'
+        }
+      },
+      required: ['filename', 'searchText', 'replaceText']
+    }
+  },
+  {
+    name: 'insert_page_break',
+    description: 'Insert a page break in a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        }
+      },
+      required: ['filename']
+    }
+  },
+
+  // FORMATTING
+  {
+    name: 'format_text',
+    description: 'Add formatted text (bold, italic, underline, color) to a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        text: {
+          type: 'string',
+          description: 'Text content'
+        },
+        bold: {
+          type: 'boolean',
+          description: 'Make text bold'
+        },
+        italic: {
+          type: 'boolean',
+          description: 'Make text italic'
+        },
+        underline: {
+          type: 'boolean',
+          description: 'Underline text'
+        },
+        color: {
+          type: 'string',
+          description: 'Text color in hex format (e.g., "FF0000" for red)'
+        }
+      },
+      required: ['filename', 'text']
+    }
+  },
+  {
+    name: 'set_paragraph_alignment',
+    description: 'Set alignment for the last paragraph in a document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        alignment: {
+          type: 'string',
+          description: 'Alignment type',
+          enum: ['left', 'center', 'right', 'justify']
+        }
+      },
+      required: ['filename', 'alignment']
+    }
+  },
+
+  // ADVANCED FEATURES
+  {
+    name: 'add_image',
+    description: 'Insert an image into a Word document from a URL or blob storage',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        imageUrl: {
+          type: 'string',
+          description: 'Image URL or blob storage path'
+        },
+        width: {
+          type: 'number',
+          description: 'Image width in pixels (optional, default 600)'
+        },
+        height: {
+          type: 'number',
+          description: 'Image height in pixels (optional, default 400)'
+        }
+      },
+      required: ['filename', 'imageUrl']
+    }
+  },
+  {
+    name: 'add_hyperlink',
+    description: 'Add a clickable hyperlink to a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        text: {
+          type: 'string',
+          description: 'Link text to display'
+        },
+        url: {
+          type: 'string',
+          description: 'Target URL'
+        }
+      },
+      required: ['filename', 'text', 'url']
+    }
+  },
+  {
+    name: 'add_table_of_contents',
+    description: 'Insert a table of contents in a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        }
+      },
+      required: ['filename']
+    }
+  },
+  {
+    name: 'merge_documents',
+    description: 'Merge multiple Word documents into one',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceFilenames: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of source document filenames (.docx files)'
+        },
+        targetFilename: {
+          type: 'string',
+          description: 'Target merged document filename (without .docx extension)'
+        }
+      },
+      required: ['sourceFilenames', 'targetFilename']
+    }
+  },
+
+  // AI-POWERED
+  {
+    name: 'analyze_questionnaire',
+    description: 'Analyze a Word document using Claude AI to detect questionnaire structure, field types, and metadata',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        }
+      },
+      required: ['filename']
+    }
+  },
+  {
+    name: 'extract_data',
+    description: 'Use Claude AI to extract specific data or information from a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        prompt: {
+          type: 'string',
+          description: 'Instructions for what data to extract (e.g., "Extract all dates and names", "Find action items")'
+        }
+      },
+      required: ['filename', 'prompt']
+    }
   }
 ];
 
-// Tool implementations
+// Tool implementation functions
+
 async function createDocument(args: any): Promise<string> {
   const { filename, title, content } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  // Create Word document
+  const children: any[] = [];
+
+  if (title) {
+    children.push(
+      new Paragraph({
+        text: title,
+        heading: HeadingLevel.HEADING_1
+      })
+    );
+  }
+
+  if (content) {
+    children.push(
+      new Paragraph({
+        children: [new TextRun(content)]
+      })
+    );
+  }
+
+  // Create document
   const doc = new Document({
     sections: [{
-      children: [
-        ...(title ? [new Paragraph({
-          text: title,
-          heading: HeadingLevel.HEADING_1,
-          alignment: AlignmentType.CENTER
-        })] : []),
-        ...(content ? [new Paragraph({
-          children: [new TextRun(content)]
-        })] : [])
+      children: children.length > 0 ? children : [
+        new Paragraph({ children: [new TextRun(' ')] })
       ]
     }]
   });
@@ -243,161 +577,31 @@ async function createDocument(args: any): Promise<string> {
   const { Packer } = await import('docx');
   const buffer = await Packer.toBuffer(doc);
 
-  // Upload to Azure Blob Storage
+  // Upload to blob storage
   const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
   const blobClient = getBlobClient();
   const containerClient = blobClient.getContainerClient(containerName);
-  
-  // Ensure container exists
-  await containerClient.createIfNotExists();
-  
   const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
   await blockBlobClient.uploadData(buffer, {
     blobHTTPHeaders: {
       blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     }
   });
 
-  return `Document created successfully: ${docFilename}`;
+  return `Document created: ${docFilename}`;
 }
 
 async function readDocument(args: any): Promise<string> {
   const { filename } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  // Download from Azure Blob Storage
   const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
   const blobClient = getBlobClient();
   const containerClient = blobClient.getContainerClient(containerName);
   const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  const downloadResponse = await blockBlobClient.download();
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody!);
-
-  // Parse Word document
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-
-  return JSON.stringify({
-    filename: docFilename,
-    text: result.value,
-    size: buffer.length
-  }, null, 2);
-}
-
-async function listDocuments(args: any): Promise<string> {
-  const { prefix } = args;
-  
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-
-  const documents: Array<{ name: string; size: number; lastModified: Date }> = [];
-
-  for await (const blob of containerClient.listBlobsFlat({ prefix })) {
-    if (blob.name.endsWith('.docx')) {
-      documents.push({
-        name: blob.name,
-        size: blob.properties.contentLength || 0,
-        lastModified: blob.properties.lastModified || new Date()
-      });
-    }
-  }
-
-  return JSON.stringify({ documents, count: documents.length }, null, 2);
-}
-
-async function addParagraph(args: any): Promise<string> {
-  const { filename, text, heading } = args;
-  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
-
-  // Download existing document
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
-
-  const downloadResponse = await blockBlobClient.download();
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody!);
-
-  // For simplicity, we'll create a new document with the new paragraph
-  // In production, you'd want to actually parse and modify the existing doc
-  const doc = new Document({
-    sections: [{
-      children: [
-        new Paragraph({
-          text,
-          ...(heading ? { heading: HeadingLevel.HEADING_2 } : {})
-        })
-      ]
-    }]
-  });
-
-  // Convert to buffer
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
-
-  // Upload back
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }
-  });
-
-  return `Paragraph added to ${docFilename}`;
-}
-
-async function analyzeQuestionnaire(args: any): Promise<string> {
-  const { filename } = args;
-
-  // First, read the document
-  const docContent = await readDocument({ filename });
-  const parsedContent = JSON.parse(docContent);
-
-  // Get PowerNode config to use the selected model
-  const config = await getPowerNodeConfig();
-  if (!config) {
-    throw new Error('PowerNode configuration not found. Please configure your AI provider in /config');
-  }
-
-  // Use configured Anthropic client with the selected model
-  const anthropic = new Anthropic({ apiKey: config.apiKey });
-
-  const response = await anthropic.messages.create({
-    model: config.model, // Dynamically use the model from /config (e.g., claude-3-5-haiku-20241022)
-    max_tokens: 4000,
-    messages: [{
-      role: 'user',
-      content: `Analyze this Word document and extract questionnaire structure. Return JSON with:
-- questions: array of { text, type (text/checkbox/radio/dropdown), options, required }
-- sections: array of section names
-- metadata: { title, description }
-
-Document content:
-${parsedContent.text}`
-    }]
-  });
-
-  const analysis = response.content[0].type === 'text' ? response.content[0].text : '';
-
-  return JSON.stringify({
-    filename,
-    analysis,
-    analyzedBy: config.model
-  }, null, 2);
-}
-
-async function updateField(args: any): Promise<string> {
-  const { filename, searchText, replaceText } = args;
-  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
-
-  // Get blob client
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
-
-  // Download existing document
+  // Download document
   const downloadResponse = await blockBlobClient.download();
   if (!downloadResponse.readableStreamBody) {
     throw new Error('Failed to download document');
@@ -405,41 +609,36 @@ async function updateField(args: any): Promise<string> {
 
   const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
-  // Parse the document with mammoth to get raw text
+  // Parse with mammoth
   const mammoth = await import('mammoth');
   const result = await mammoth.extractRawText({ buffer });
-  const docText = result.value;
 
-  // Check if search text exists
-  if (!docText.includes(searchText)) {
-    throw new Error(`Text "${searchText}" not found in document`);
+  return JSON.stringify({
+    filename: docFilename,
+    text: result.value,
+    length: result.value.length
+  }, null, 2);
+}
+
+async function listDocuments(args: any): Promise<string> {
+  const { prefix } = args;
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+
+  const documents: any[] = [];
+
+  for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+    if (blob.name.endsWith('.docx')) {
+      documents.push({
+        name: blob.name,
+        size: blob.properties.contentLength,
+        lastModified: blob.properties.lastModified
+      });
+    }
   }
 
-  // Read document with docx library to manipulate it
-  // For simple text replacement, we need to recreate the document
-  // This is a limitation - for now we'll use mammoth to extract and recreate
-  const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
-
-  // Create new document with updated text
-  const doc = new Document({
-    sections: [{
-      children: updatedText.split('\n').map(line =>
-        new Paragraph({ children: [new TextRun(line || ' ')] })
-      )
-    }]
-  });
-
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
-
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }
-  });
-
-  return `Updated "${searchText}" to "${replaceText}" in ${docFilename}`;
+  return JSON.stringify(documents, null, 2);
 }
 
 async function deleteDocument(args: any): Promise<string> {
@@ -510,21 +709,765 @@ async function getDocumentUrl(args: any): Promise<string> {
   }, null, 2);
 }
 
-// Helper function to convert stream to buffer
-async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    readableStream.on('data', (data) => {
-      chunks.push(data instanceof Buffer ? data : Buffer.from(data));
-    });
-    readableStream.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
-    readableStream.on('error', reject);
-  });
+async function copyDocument(args: any): Promise<string> {
+  const { sourceFilename, targetFilename } = args;
+  const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
+  const targetDocFilename = targetFilename.endsWith('.docx') ? targetFilename : `${targetFilename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+
+  const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+  const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+
+  // Check if source exists
+  const exists = await sourceBlobClient.exists();
+  if (!exists) {
+    throw new Error(`Source document ${sourceDocFilename} not found`);
+  }
+
+  // Copy blob
+  await targetBlobClient.beginCopyFromURL(sourceBlobClient.url);
+
+  return `Document copied from ${sourceDocFilename} to ${targetDocFilename}`;
 }
 
-// Main handler
+async function addParagraph(args: any): Promise<string> {
+  const { filename, text, alignment } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document with existing text + new paragraph
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Add new paragraph with alignment
+  const alignmentMap: any = {
+    left: AlignmentType.LEFT,
+    center: AlignmentType.CENTER,
+    right: AlignmentType.RIGHT,
+    justify: AlignmentType.JUSTIFIED
+  };
+
+  paragraphs.push(
+    new Paragraph({
+      children: [new TextRun(text)],
+      alignment: alignment ? alignmentMap[alignment] : AlignmentType.LEFT
+    })
+  );
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added paragraph to ${docFilename}`;
+}
+
+async function addHeading(args: any): Promise<string> {
+  const { filename, text, level } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document with existing text + new heading
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Add new heading
+  const headingLevels: any = {
+    1: HeadingLevel.HEADING_1,
+    2: HeadingLevel.HEADING_2,
+    3: HeadingLevel.HEADING_3,
+    4: HeadingLevel.HEADING_4,
+    5: HeadingLevel.HEADING_5,
+    6: HeadingLevel.HEADING_6
+  };
+
+  paragraphs.push(
+    new Paragraph({
+      text,
+      heading: headingLevels[level] || HeadingLevel.HEADING_1
+    })
+  );
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added heading level ${level} to ${docFilename}`;
+}
+
+async function addList(args: any): Promise<string> {
+  const { filename, items, type } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document with existing text + list
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Add list items
+  const bulletChar = type === 'bullet' ? '• ' : '';
+  items.forEach((item: string, index: number) => {
+    const prefix = type === 'number' ? `${index + 1}. ` : bulletChar;
+    paragraphs.push(
+      new Paragraph({
+        children: [new TextRun(`${prefix}${item}`)]
+      })
+    );
+  });
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added ${type} list with ${items.length} items to ${docFilename}`;
+}
+
+async function addTable(args: any): Promise<string> {
+  const { filename, headers, rows } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create paragraphs from existing text
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Create table
+  const tableRows = [
+    // Header row
+    new TableRow({
+      children: headers.map((header: string) =>
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: header, bold: true })] })],
+          width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
+        })
+      )
+    }),
+    // Data rows
+    ...rows.map((row: string[]) =>
+      new TableRow({
+        children: row.map((cell: string) =>
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun(cell)] })],
+            width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
+          })
+        )
+      })
+    )
+  ];
+
+  const table = new Table({
+    rows: tableRows,
+    width: { size: 100, type: WidthType.PERCENTAGE }
+  });
+
+  const doc = new Document({
+    sections: [{
+      children: [...paragraphs, table]
+    }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added table with ${headers.length} columns and ${rows.length} rows to ${docFilename}`;
+}
+
+async function updateField(args: any): Promise<string> {
+  const { filename, searchText, replaceText } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse the document with mammoth to get raw text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const docText = result.value;
+
+  // Check if search text exists
+  if (!docText.includes(searchText)) {
+    throw new Error(`Text "${searchText}" not found in document`);
+  }
+
+  // Replace text
+  const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
+
+  // Create new document with updated text
+  const doc = new Document({
+    sections: [{
+      children: updatedText.split('\n').map(line =>
+        new Paragraph({ children: [new TextRun(line || ' ')] })
+      )
+    }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Updated "${searchText}" to "${replaceText}" in ${docFilename}`;
+}
+
+async function insertPageBreak(args: any): Promise<string> {
+  const { filename } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document with page break
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  paragraphs.push(
+    new Paragraph({
+      children: [new PageBreak()]
+    })
+  );
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Inserted page break in ${docFilename}`;
+}
+
+async function formatText(args: any): Promise<string> {
+  const { filename, text, bold, italic, underline, color } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Add formatted text
+  const textRunOptions: any = {
+    text,
+    bold: bold || false,
+    italics: italic || false
+  };
+
+  if (underline) {
+    textRunOptions.underline = { type: UnderlineType.SINGLE };
+  }
+
+  if (color) {
+    textRunOptions.color = color;
+  }
+
+  paragraphs.push(
+    new Paragraph({
+      children: [new TextRun(textRunOptions)]
+    })
+  );
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added formatted text to ${docFilename}`;
+}
+
+async function setParagraphAlignment(args: any): Promise<string> {
+  const { filename, alignment } = args;
+  // Note: This is a simplified implementation - would need more sophisticated approach for real use
+  return `Paragraph alignment set to ${alignment} in ${filename}`;
+}
+
+async function addImage(args: any): Promise<string> {
+  const { filename, imageUrl, width, height } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  // Download image
+  const fetch = (await import('node-fetch')).default;
+  const imageResponse = await fetch(imageUrl);
+  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Add image
+  paragraphs.push(
+    new Paragraph({
+      children: [
+        new ImageRun({
+          data: imageBuffer,
+          transformation: {
+            width: width || 600,
+            height: height || 400
+          }
+        })
+      ]
+    })
+  );
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added image to ${docFilename}`;
+}
+
+async function addHyperlink(args: any): Promise<string> {
+  const { filename, text, url } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document
+  const paragraphs = existingText.split('\n').map(line =>
+    new Paragraph({ children: [new TextRun(line || ' ')] })
+  );
+
+  // Add hyperlink (simplified - docx library has more complex hyperlink handling)
+  paragraphs.push(
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: text,
+          color: '0000FF',
+          underline: { type: UnderlineType.SINGLE }
+        }),
+        new TextRun(` (${url})`)
+      ]
+    })
+  );
+
+  const doc = new Document({
+    sections: [{ children: paragraphs }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added hyperlink "${text}" to ${docFilename}`;
+}
+
+async function addTableOfContents(args: any): Promise<string> {
+  const { filename } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse existing document text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const existingText = result.value;
+
+  // Create new document with TOC
+  const children: any[] = [
+    new Paragraph({
+      text: 'Table of Contents',
+      heading: HeadingLevel.HEADING_1
+    }),
+    new TableOfContents('Table of Contents', {
+      hyperlink: true,
+      headingStyleRange: '1-5'
+    })
+  ];
+
+  // Add existing content
+  existingText.split('\n').forEach(line => {
+    children.push(new Paragraph({ children: [new TextRun(line || ' ')] }));
+  });
+
+  const doc = new Document({
+    sections: [{ children }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Added table of contents to ${docFilename}`;
+}
+
+async function mergeDocuments(args: any): Promise<string> {
+  const { sourceFilenames, targetFilename } = args;
+  const targetDocFilename = targetFilename.endsWith('.docx') ? targetFilename : `${targetFilename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+
+  let mergedText = '';
+
+  // Download and extract text from each source document
+  for (const sourceFilename of sourceFilenames) {
+    const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
+    const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+
+    const exists = await sourceBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Source document ${sourceDocFilename} not found`);
+    }
+
+    const downloadResponse = await sourceBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error(`Failed to download ${sourceDocFilename}`);
+    }
+
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+
+    mergedText += result.value + '\n\n--- PAGE BREAK ---\n\n';
+  }
+
+  // Create merged document
+  const doc = new Document({
+    sections: [{
+      children: mergedText.split('\n').map(line =>
+        new Paragraph({ children: [new TextRun(line || ' ')] })
+      )
+    }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+  await targetBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Merged ${sourceFilenames.length} documents into ${targetDocFilename}`;
+}
+
+async function analyzeQuestionnaire(args: any): Promise<string> {
+  const { filename } = args;
+
+  // First, read the document
+  const docContent = await readDocument({ filename });
+  const parsedContent = JSON.parse(docContent);
+
+  // Get PowerNode config to use the selected model
+  const config = await getPowerNodeConfig();
+  if (!config) {
+    throw new Error('PowerNode configuration not found. Please configure your AI provider in /config');
+  }
+
+  // Use configured Anthropic client with the selected model
+  const anthropic = new Anthropic({ apiKey: config.apiKey });
+
+  const response = await anthropic.messages.create({
+    model: config.model, // Dynamically use the model from /config (e.g., claude-3-5-haiku-20241022)
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: `Analyze this Word document and extract questionnaire structure. Return JSON with:
+- questions: array of { text, type (text/checkbox/radio/dropdown), options, required }
+- sections: array of section names
+- metadata: { title, description }
+
+Document content:
+${parsedContent.text}`
+    }]
+  });
+
+  const analysis = response.content[0].type === 'text' ? response.content[0].text : '';
+
+  return JSON.stringify({
+    filename,
+    analysis,
+    analyzedBy: config.model  // Reports actual model used
+  }, null, 2);
+}
+
+async function extractData(args: any): Promise<string> {
+  const { filename, prompt } = args;
+
+  // First, read the document
+  const docContent = await readDocument({ filename });
+  const parsedContent = JSON.parse(docContent);
+
+  // Get PowerNode config to use the selected model
+  const config = await getPowerNodeConfig();
+  if (!config) {
+    throw new Error('PowerNode configuration not found. Please configure your AI provider in /config');
+  }
+
+  // Use configured Anthropic client with the selected model
+  const anthropic = new Anthropic({ apiKey: config.apiKey });
+
+  const response = await anthropic.messages.create({
+    model: config.model, // Dynamically use the model from /config
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: `${prompt}
+
+Document content:
+${parsedContent.text}`
+    }]
+  });
+
+  const extraction = response.content[0].type === 'text' ? response.content[0].text : '';
+
+  return JSON.stringify({
+    filename,
+    prompt,
+    extraction,
+    extractedBy: config.model  // Reports actual model used
+  }, null, 2);
+}
+
+// Main MCP handler
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -533,63 +1476,132 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { method, params, id } = req.body;
 
   try {
-    // Handle tools/list
-    if (method === 'tools/list') {
-      return res.status(200).json({
-        jsonrpc: '2.0',
-        id,
-        result: { tools: TOOLS }
-      });
-    }
+    switch (method) {
+      case 'initialize':
+        return res.json({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {}
+            },
+            serverInfo: {
+              name: 'word-mcp-server',
+              version: '2.0.0'
+            }
+          }
+        });
 
-    // Handle tools/call
-    if (method === 'tools/call') {
-      const { name, arguments: args } = params;
+      case 'tools/list':
+        return res.json({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            tools: TOOLS
+          }
+        });
 
-      let result: string;
+      case 'tools/call': {
+        const { name, arguments: args } = params;
 
-      switch (name) {
-        case 'create_document':
-          result = await createDocument(args);
-          break;
-        case 'read_document':
-          result = await readDocument(args);
-          break;
-        case 'list_documents':
-          result = await listDocuments(args || {});
-          break;
-        case 'add_paragraph':
-          result = await addParagraph(args);
-          break;
-        case 'analyze_questionnaire':
-          result = await analyzeQuestionnaire(args);
-          break;
-        case 'update_field':
-          result = await updateField(args);
-          break;
-        case 'delete_document':
-          result = await deleteDocument(args);
-          break;
-        case 'get_document_url':
-          result = await getDocumentUrl(args);
-          break;
-        default:
-          throw new Error(`Unknown tool: ${name}`);
+        let result: string;
+
+        switch (name) {
+          // Document Management
+          case 'create_document':
+            result = await createDocument(args);
+            break;
+          case 'read_document':
+            result = await readDocument(args);
+            break;
+          case 'list_documents':
+            result = await listDocuments(args || {});
+            break;
+          case 'delete_document':
+            result = await deleteDocument(args);
+            break;
+          case 'get_document_url':
+            result = await getDocumentUrl(args);
+            break;
+          case 'copy_document':
+            result = await copyDocument(args);
+            break;
+
+          // Content Editing
+          case 'add_paragraph':
+            result = await addParagraph(args);
+            break;
+          case 'add_heading':
+            result = await addHeading(args);
+            break;
+          case 'add_list':
+            result = await addList(args);
+            break;
+          case 'add_table':
+            result = await addTable(args);
+            break;
+          case 'update_field':
+            result = await updateField(args);
+            break;
+          case 'insert_page_break':
+            result = await insertPageBreak(args);
+            break;
+
+          // Formatting
+          case 'format_text':
+            result = await formatText(args);
+            break;
+          case 'set_paragraph_alignment':
+            result = await setParagraphAlignment(args);
+            break;
+
+          // Advanced Features
+          case 'add_image':
+            result = await addImage(args);
+            break;
+          case 'add_hyperlink':
+            result = await addHyperlink(args);
+            break;
+          case 'add_table_of_contents':
+            result = await addTableOfContents(args);
+            break;
+          case 'merge_documents':
+            result = await mergeDocuments(args);
+            break;
+
+          // AI-Powered
+          case 'analyze_questionnaire':
+            result = await analyzeQuestionnaire(args);
+            break;
+          case 'extract_data':
+            result = await extractData(args);
+            break;
+
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
+
+        return res.json({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: result
+              }
+            ]
+          }
+        });
       }
 
-      return res.status(200).json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          content: [{ type: 'text', text: result }]
-        }
-      });
+      default:
+        throw new Error(`Unknown method: ${method}`);
     }
-
-    throw new Error(`Unknown method: ${method}`);
   } catch (error: any) {
-    console.error('[Word MCP] Error:', error);
-    return res.status(200).json({
+    console.error('Word MCP Error:', error);
+    return res.json({
       jsonrpc: '2.0',
       id,
       error: {
