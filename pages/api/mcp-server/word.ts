@@ -9,12 +9,15 @@ import { TableClient } from '@azure/data-tables';
  *
  * Following n8n MCP pattern - no child processes, clean JSON-RPC 2.0
  *
- * 5 Core Tools:
+ * 8 Complete Tools:
  * 1. create_document - Create new Word documents
  * 2. read_document - Read and extract Word document content
  * 3. list_documents - List available .docx files
  * 4. add_paragraph - Add content to existing documents
  * 5. analyze_questionnaire - AI-powered questionnaire analysis (uses configured model from /config)
+ * 6. update_field - Find and replace specific text in documents
+ * 7. delete_document - Delete documents from blob storage
+ * 8. get_document_url - Get temporary download URLs (1 hour expiry)
  */
 
 // Initialize clients (lazy loaded)
@@ -152,6 +155,56 @@ const TOOLS = [
   {
     name: 'analyze_questionnaire',
     description: 'Analyze a Word document using Claude AI to detect questionnaire structure, field types, and metadata',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        }
+      },
+      required: ['filename']
+    }
+  },
+  {
+    name: 'update_field',
+    description: 'Find and replace specific text content in a Word document',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file)'
+        },
+        searchText: {
+          type: 'string',
+          description: 'Text to find in the document'
+        },
+        replaceText: {
+          type: 'string',
+          description: 'New text to replace with'
+        }
+      },
+      required: ['filename', 'searchText', 'replaceText']
+    }
+  },
+  {
+    name: 'delete_document',
+    description: 'Delete a Word document from Azure Blob Storage',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Document filename (.docx file) to delete'
+        }
+      },
+      required: ['filename']
+    }
+  },
+  {
+    name: 'get_document_url',
+    description: 'Get a temporary download URL for a Word document (valid for 1 hour)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -334,6 +387,129 @@ ${parsedContent.text}`
   }, null, 2);
 }
 
+async function updateField(args: any): Promise<string> {
+  const { filename, searchText, replaceText } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  // Get blob client
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Download existing document
+  const downloadResponse = await blockBlobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error('Failed to download document');
+  }
+
+  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+  // Parse the document with mammoth to get raw text
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ buffer });
+  const docText = result.value;
+
+  // Check if search text exists
+  if (!docText.includes(searchText)) {
+    throw new Error(`Text "${searchText}" not found in document`);
+  }
+
+  // Read document with docx library to manipulate it
+  // For simple text replacement, we need to recreate the document
+  // This is a limitation - for now we'll use mammoth to extract and recreate
+  const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
+
+  // Create new document with updated text
+  const doc = new Document({
+    sections: [{
+      children: updatedText.split('\n').map(line =>
+        new Paragraph({ children: [new TextRun(line || ' ')] })
+      )
+    }]
+  });
+
+  // Convert and upload
+  const { Packer } = await import('docx');
+  const newBuffer = await Packer.toBuffer(doc);
+
+  await blockBlobClient.uploadData(newBuffer, {
+    blobHTTPHeaders: {
+      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
+  });
+
+  return `Updated "${searchText}" to "${replaceText}" in ${docFilename}`;
+}
+
+async function deleteDocument(args: any): Promise<string> {
+  const { filename } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Check if exists
+  const exists = await blockBlobClient.exists();
+  if (!exists) {
+    throw new Error(`Document ${docFilename} not found`);
+  }
+
+  // Delete
+  await blockBlobClient.delete();
+
+  return `Document ${docFilename} deleted successfully`;
+}
+
+async function getDocumentUrl(args: any): Promise<string> {
+  const { filename } = args;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+  const blobClient = getBlobClient();
+  const containerClient = blobClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+  // Check if exists
+  const exists = await blockBlobClient.exists();
+  if (!exists) {
+    throw new Error(`Document ${docFilename} not found`);
+  }
+
+  // Generate SAS token (valid for 1 hour)
+  const { BlobSASPermissions, generateBlobSASQueryParameters, StorageSharedKeyCredential } = await import('@azure/storage-blob');
+
+  const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!connectionString) {
+    throw new Error('AZURE_STORAGE_CONNECTION_STRING not set');
+  }
+
+  // Parse connection string to get account name and key
+  const parts = connectionString.split(';');
+  const accountName = parts.find(p => p.startsWith('AccountName='))?.split('=')[1] || '';
+  const accountKey = parts.find(p => p.startsWith('AccountKey='))?.split('=')[1] || '';
+
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+
+  const sasToken = generateBlobSASQueryParameters({
+    containerName,
+    blobName: docFilename,
+    permissions: BlobSASPermissions.parse('r'), // read-only
+    startsOn: new Date(),
+    expiresOn: new Date(new Date().valueOf() + 3600 * 1000), // 1 hour
+  }, sharedKeyCredential).toString();
+
+  const url = `${blockBlobClient.url}?${sasToken}`;
+
+  return JSON.stringify({
+    filename: docFilename,
+    url,
+    expiresIn: '1 hour'
+  }, null, 2);
+}
+
 // Helper function to convert stream to buffer
 async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -387,6 +563,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           break;
         case 'analyze_questionnaire':
           result = await analyzeQuestionnaire(args);
+          break;
+        case 'update_field':
+          result = await updateField(args);
+          break;
+        case 'delete_document':
+          result = await deleteDocument(args);
+          break;
+        case 'get_document_url':
+          result = await getDocumentUrl(args);
           break;
         default:
           throw new Error(`Unknown tool: ${name}`);
