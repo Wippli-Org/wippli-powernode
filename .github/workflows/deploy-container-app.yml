@@ -47,6 +47,11 @@ jobs:
           cp -r .next/standalone/. build/
           cp -r .next/static build/.next/
           cp -r public build/
+          # Copy Word MCP server files (if they exist)
+          if [ -d "mcp-servers" ]; then
+            cp -r mcp-servers build/
+            echo "✓ Copied MCP server files"
+          fi
           ls -la build/
           ls -la build/.next/
 
