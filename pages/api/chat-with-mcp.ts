@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { message, conversationHistory } = req.body;
+  const { message, conversationHistory, fileUrl, fileName, fileId, driveId, storageProvider, oneDriveConfig } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: 'Message required' });
@@ -39,6 +39,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     addLog('INFO', 'PowerNode Chat', `Received message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+
+    // OneDrive File Access - Download file if provided
+    let fileContent: Buffer | null = null;
+    let fileMetadata: any = null;
+
+    if (storageProvider === 'onedrive' && oneDriveConfig?.accessToken && fileId) {
+      addLog('INFO', 'OneDrive Storage', `Downloading file from OneDrive...`, { fileId, fileName });
+
+      try {
+        const downloadStartTime = Date.now();
+
+        // Call our storage API to download the file
+        const protocol = req.headers.host?.includes('localhost') ? 'http' : 'https';
+        const downloadResponse = await fetch(
+          `${protocol}://${req.headers.host}/api/storage/onedrive/download?fileId=${fileId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${oneDriveConfig.accessToken}`,
+            },
+          }
+        );
+
+        if (!downloadResponse.ok) {
+          const errorText = await downloadResponse.text();
+          throw new Error(`OneDrive download failed: ${downloadResponse.status} - ${errorText}`);
+        }
+
+        fileContent = Buffer.from(await downloadResponse.arrayBuffer());
+        const downloadDuration = Date.now() - downloadStartTime;
+
+        addLog('SUCCESS', 'OneDrive Storage', `File downloaded successfully (${downloadDuration}ms)`, {
+          fileName,
+          fileSize: `${(fileContent.length / 1024).toFixed(2)} KB`,
+        });
+
+        // Store file metadata for MCP tools
+        fileMetadata = {
+          name: fileName,
+          id: fileId,
+          driveId: driveId,
+          url: fileUrl,
+          size: fileContent.length,
+          storageProvider: 'onedrive',
+        };
+
+      } catch (error: any) {
+        addLog('ERROR', 'OneDrive Storage', `Failed to download file: ${error.message}`);
+        // Don't fail the entire request, just log the error
+        // MCP tools will get the file URL instead
+      }
+    }
 
     // Load REAL configuration (server-side, direct access)
     addLog('INFO', 'Config Loader', 'Loading AI provider configuration...');
@@ -228,15 +280,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
           // Call our MCP execute-tool API
           const toolStartTime = Date.now();
+
+          // Prepare tool execution payload
+          const toolPayload: any = {
+            serverId,
+            toolName: originalToolName,
+            arguments: toolInput,
+            userId: creatorId,
+          };
+
+          // Pass file information if available
+          if (fileMetadata) {
+            toolPayload.fileMetadata = fileMetadata;
+          }
+
+          // Pass OneDrive config if file content was downloaded
+          if (fileContent && oneDriveConfig) {
+            toolPayload.storageConfig = {
+              provider: 'onedrive',
+              accessToken: oneDriveConfig.accessToken,
+              fileContent: fileContent.toString('base64'), // Convert to base64 for JSON transport
+            };
+          }
+
           const toolResponse = await fetch(`${req.headers.host?.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/mcp/execute-tool`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              serverId,
-              toolName: originalToolName,
-              arguments: toolInput,
-              userId: creatorId,
-            }),
+            body: JSON.stringify(toolPayload),
           });
 
           const toolData = await toolResponse.json();
@@ -368,6 +438,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         duration: Date.now() - startTime,
         mcpToolsExecuted: totalToolExecutions,
         toolsAvailable: tools.length,
+        fileMetadata: fileMetadata || undefined,
       },
     });
 

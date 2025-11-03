@@ -210,35 +210,235 @@ async function handleBlobDownload(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// ONEDRIVE HANDLERS (Placeholder - to be implemented)
-async function handleOneDriveList(res: NextApiResponse) {
-  res.status(501).json({
-    error: 'OneDrive integration not yet implemented',
-    files: [],
-    message: 'Microsoft Graph API integration coming soon',
-  });
+// ONEDRIVE HANDLERS (Microsoft Graph API)
+async function handleOneDriveList(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!accessToken) {
+      res.status(401).json({ error: 'OneDrive access token required' });
+      return;
+    }
+
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Microsoft Graph API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const files = data.value.map((item: any) => ({
+      name: item.name,
+      size: item.size || 0,
+      lastModified: item.lastModifiedDateTime,
+      type: item.file?.mimeType || 'folder',
+      path: item.parentReference?.path || '',
+      id: item.id,
+    }));
+
+    res.status(200).json({ files, totalSize: files.reduce((sum: number, f: any) => sum + f.size, 0) });
+  } catch (error: any) {
+    console.error('OneDrive list error:', error);
+    res.status(500).json({ error: error.message || 'Failed to list files' });
+  }
 }
 
-async function handleOneDriveStatus(res: NextApiResponse) {
-  res.status(200).json({
-    connected: false,
-    fileCount: 0,
-    usedSize: 0,
-    totalSize: null,
-    message: 'OneDrive integration coming soon',
-  });
+async function handleOneDriveStatus(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!accessToken) {
+      res.status(200).json({
+        connected: false,
+        fileCount: 0,
+        usedSize: 0,
+        totalSize: null,
+        message: 'OneDrive access token not provided',
+      });
+      return;
+    }
+
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/drive', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Microsoft Graph API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    res.status(200).json({
+      connected: true,
+      fileCount: data.quota?.fileCount || 0,
+      usedSize: data.quota?.used || 0,
+      totalSize: data.quota?.total || null,
+    });
+  } catch (error: any) {
+    console.error('OneDrive status error:', error);
+    res.status(200).json({
+      connected: false,
+      fileCount: 0,
+      usedSize: 0,
+      totalSize: null,
+      error: error.message,
+    });
+  }
 }
 
-async function handleOneDriveUpload(res: NextApiResponse) {
-  res.status(501).json({ error: 'OneDrive integration not yet implemented' });
+async function handleOneDriveUpload(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!accessToken) {
+      res.status(401).json({ error: 'OneDrive access token required' });
+      return;
+    }
+
+    const { files } = await parseForm(req);
+    const file = Array.isArray(files.file) ? files.file[0] : files.file;
+
+    if (!file) {
+      res.status(400).json({ error: 'No file provided' });
+      return;
+    }
+
+    const fileBuffer = fs.readFileSync(file.filepath);
+    const fileName = file.originalFilename || file.newFilename;
+
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/${fileName}:/content`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': file.mimetype || 'application/octet-stream',
+        },
+        body: fileBuffer,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Microsoft Graph API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Clean up temp file
+    fs.unlinkSync(file.filepath);
+
+    res.status(200).json({
+      success: true,
+      fileName: data.name,
+      size: data.size,
+      id: data.id,
+      webUrl: data.webUrl,
+    });
+  } catch (error: any) {
+    console.error('OneDrive upload error:', error);
+    res.status(500).json({ error: error.message || 'Upload failed' });
+  }
 }
 
-async function handleOneDriveDelete(res: NextApiResponse) {
-  res.status(501).json({ error: 'OneDrive integration not yet implemented' });
+async function handleOneDriveDelete(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!accessToken) {
+      res.status(401).json({ error: 'OneDrive access token required' });
+      return;
+    }
+
+    const { fileId } = req.body;
+
+    if (!fileId) {
+      res.status(400).json({ error: 'File ID is required' });
+      return;
+    }
+
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok && response.status !== 204) {
+      throw new Error(`Microsoft Graph API error: ${response.status}`);
+    }
+
+    res.status(200).json({ success: true, fileId });
+  } catch (error: any) {
+    console.error('OneDrive delete error:', error);
+    res.status(500).json({ error: error.message || 'Delete failed' });
+  }
 }
 
-async function handleOneDriveDownload(res: NextApiResponse) {
-  res.status(501).json({ error: 'OneDrive integration not yet implemented' });
+async function handleOneDriveDownload(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+    const { fileId } = req.query;
+
+    if (!accessToken) {
+      res.status(401).json({ error: 'OneDrive access token required' });
+      return;
+    }
+
+    if (!fileId || typeof fileId !== 'string') {
+      res.status(400).json({ error: 'File ID is required' });
+      return;
+    }
+
+    // Get file metadata
+    const metadataResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!metadataResponse.ok) {
+      throw new Error(`Microsoft Graph API error: ${metadataResponse.status}`);
+    }
+
+    const metadata = await metadataResponse.json();
+
+    // Download file content
+    const downloadResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!downloadResponse.ok) {
+      throw new Error(`Microsoft Graph API error: ${downloadResponse.status}`);
+    }
+
+    const fileBuffer = await downloadResponse.arrayBuffer();
+
+    res.setHeader('Content-Type', metadata.file?.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${metadata.name}"`);
+    res.setHeader('Content-Length', fileBuffer.byteLength);
+
+    res.send(Buffer.from(fileBuffer));
+  } catch (error: any) {
+    console.error('OneDrive download error:', error);
+    res.status(500).json({ error: error.message || 'Download failed' });
+  }
 }
 
 // GOOGLE DRIVE HANDLERS (Placeholder - to be implemented)
@@ -314,19 +514,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else if (provider === 'onedrive') {
       switch (action) {
         case 'list':
-          await handleOneDriveList(res);
+          await handleOneDriveList(req, res);
           break;
         case 'status':
-          await handleOneDriveStatus(res);
+          await handleOneDriveStatus(req, res);
           break;
         case 'upload':
-          await handleOneDriveUpload(res);
+          if (req.method !== 'POST') {
+            res.status(405).json({ error: 'Method not allowed' });
+            return;
+          }
+          await handleOneDriveUpload(req, res);
           break;
         case 'delete':
-          await handleOneDriveDelete(res);
+          if (req.method !== 'DELETE') {
+            res.status(405).json({ error: 'Method not allowed' });
+            return;
+          }
+          await handleOneDriveDelete(req, res);
           break;
         case 'download':
-          await handleOneDriveDownload(res);
+          await handleOneDriveDownload(req, res);
           break;
         default:
           res.status(404).json({ error: 'Action not found' });
