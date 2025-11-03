@@ -16,7 +16,9 @@ let MimeType: any = null;
 
 try {
   if (process.env.ADOBE_PDF_CLIENT_ID && process.env.ADOBE_PDF_CLIENT_SECRET) {
+    console.log('Loading Adobe PDF Services SDK...');
     const adobeSDK = require('@adobe/pdfservices-node-sdk');
+    console.log('Adobe SDK loaded, keys:', Object.keys(adobeSDK).join(', '));
     PDFServices = adobeSDK.PDFServices;
     Credentials = adobeSDK.Credentials;
     ExtractPDFParams = adobeSDK.ExtractPDFParams;
@@ -24,11 +26,13 @@ try {
     ExtractPDFJob = adobeSDK.ExtractPDFJob;
     ExtractPDFResult = adobeSDK.ExtractPDFResult;
     MimeType = adobeSDK.MimeType;
+    console.log('PDFServices:', typeof PDFServices);
+    console.log('Credentials:', typeof Credentials);
     adobeAvailable = true;
     console.log('Adobe PDF Services enabled');
   }
-} catch (error) {
-  console.log('Adobe PDF Services not available, using pdf-lib only');
+} catch (error: any) {
+  console.log('Adobe PDF Services not available:', error.message);
 }
 
 /**
