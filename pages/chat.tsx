@@ -52,45 +52,57 @@ export default function ChatPage() {
     return `powernode-${getWippliId()}-${key}`;
   };
 
-  // Load conversations from localStorage on mount
+  // Load conversations from Azure Table Storage on mount
   useEffect(() => {
-    const savedConversations = localStorage.getItem(getStorageKey('conversations'));
-    const savedActiveId = localStorage.getItem(getStorageKey('active-conversation'));
-
-    if (savedConversations) {
+    const loadConversations = async () => {
       try {
-        const parsed = JSON.parse(savedConversations);
-        // Convert timestamp strings back to Date objects
-        const conversationsWithDates = parsed.map((conv: any) => ({
-          ...conv,
-          createdAt: new Date(conv.createdAt),
-          updatedAt: new Date(conv.updatedAt),
-          messages: conv.messages.map((m: any) => ({
-            ...m,
-            timestamp: new Date(m.timestamp),
-          })),
-        }));
-        setConversations(conversationsWithDates);
+        // Get userId and wippliId from instance config or localStorage
+        const userId = localStorage.getItem('user_id') || 'default-user';
+        const wippliId = localStorage.getItem('wippli_id') || '';
 
-        // Load active conversation
-        if (savedActiveId && conversationsWithDates.find((c: Conversation) => c.id === savedActiveId)) {
-          setActiveConversationId(savedActiveId);
-          const activeConv = conversationsWithDates.find((c: Conversation) => c.id === savedActiveId);
-          if (activeConv) {
-            setMessages(activeConv.messages);
+        // Fetch conversations from Azure
+        const response = await fetch(`/api/conversations?userId=${userId}${wippliId ? `&wippliId=${wippliId}` : ''}`);
+        const data = await response.json();
+
+        if (data.conversations && data.conversations.length > 0) {
+          // Convert timestamp strings back to Date objects
+          const conversationsWithDates = data.conversations.map((conv: any) => ({
+            ...conv,
+            createdAt: new Date(conv.createdAt),
+            updatedAt: new Date(conv.updatedAt),
+            messages: conv.messages.map((m: any) => ({
+              ...m,
+              timestamp: new Date(m.timestamp),
+            })),
+          }));
+
+          setConversations(conversationsWithDates);
+
+          // Load active conversation from localStorage or use first
+          const savedActiveId = localStorage.getItem(getStorageKey('active-conversation'));
+          if (savedActiveId && conversationsWithDates.find((c: Conversation) => c.id === savedActiveId)) {
+            setActiveConversationId(savedActiveId);
+            const activeConv = conversationsWithDates.find((c: Conversation) => c.id === savedActiveId);
+            if (activeConv) {
+              setMessages(activeConv.messages);
+            }
+          } else if (conversationsWithDates.length > 0) {
+            // Default to first conversation (most recent)
+            setActiveConversationId(conversationsWithDates[0].id);
+            setMessages(conversationsWithDates[0].messages);
           }
-        } else if (conversationsWithDates.length > 0) {
-          // Default to first conversation
-          setActiveConversationId(conversationsWithDates[0].id);
-          setMessages(conversationsWithDates[0].messages);
+        } else {
+          // Create first conversation if none exist
+          createNewConversation();
         }
       } catch (err) {
-        console.error('Failed to load saved conversations:', err);
+        console.error('Failed to load conversations:', err);
+        // Fallback to creating new conversation
+        createNewConversation();
       }
-    } else {
-      // Create first conversation if none exist
-      createNewConversation();
-    }
+    };
+
+    loadConversations();
   }, []);
 
   // Save conversations to localStorage whenever they change
@@ -174,12 +186,19 @@ export default function ChatPage() {
     setError(null);
 
     try {
+      // Get userId and wippliId
+      const userId = localStorage.getItem('user_id') || 'default-user';
+      const wippliId = localStorage.getItem('wippli_id') || '';
+
       const response = await fetch('/api/chat-with-mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: input,
           conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
+          conversationId: activeConversationId,
+          userId: userId,
+          wippliId: wippliId,
         }),
       });
 

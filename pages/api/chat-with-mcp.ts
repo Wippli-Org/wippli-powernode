@@ -16,11 +16,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { message, conversationHistory, fileUrl, fileName, fileId, driveId, storageProvider, oneDriveConfig } = req.body;
+  const {
+    message,
+    conversationHistory,
+    fileUrl,
+    fileName,
+    fileId,
+    driveId,
+    storageProvider,
+    oneDriveConfig,
+    conversationId,
+    userId,
+    wippliId,
+  } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: 'Message required' });
   }
+
+  const effectiveUserId = userId || 'default-user';
+  const effectiveConversationId = conversationId || `conv-${Date.now()}`;
 
   const logs: LogEntry[] = [];
   const startTime = Date.now();
@@ -426,10 +441,86 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     addLog('SUCCESS', 'PowerNode Chat', `Response ready (${Date.now() - startTime}ms total)`);
 
+    // Save conversation to Azure Table Storage
+    try {
+      const conversationTableClient = TableClient.fromConnectionString(
+        POWERNODE_STORAGE_CONNECTION,
+        'powernodeConversations'
+      );
+
+      // Ensure table exists
+      try {
+        await conversationTableClient.createTable();
+      } catch (err: any) {
+        if (err.statusCode !== 409) {
+          console.error('Error creating conversations table:', err);
+        }
+      }
+
+      // Build updated messages array
+      const updatedMessages = [
+        ...(conversationHistory || []).map((m: any, idx: number) => ({
+          id: `msg-${Date.now()}-${idx}`,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date().toISOString(),
+        })),
+        {
+          id: `msg-${Date.now()}-user`,
+          role: 'user',
+          content: message,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: `msg-${Date.now()}-assistant`,
+          role: 'assistant',
+          content: reply,
+          timestamp: new Date().toISOString(),
+          logs: logs,
+        },
+      ];
+
+      // Try to get existing conversation
+      let existingConv;
+      try {
+        existingConv = await conversationTableClient.getEntity(
+          effectiveUserId,
+          effectiveConversationId
+        );
+      } catch (error: any) {
+        if (error.statusCode !== 404) {
+          console.error('Error fetching existing conversation:', error);
+        }
+      }
+
+      const now = new Date().toISOString();
+      const conversationEntity = {
+        partitionKey: effectiveUserId,
+        rowKey: effectiveConversationId,
+        name: existingConv?.name || `Conversation ${effectiveConversationId.slice(-8)}`,
+        wippliId: wippliId || existingConv?.wippliId || '',
+        messages: JSON.stringify(updatedMessages),
+        createdAt: existingConv?.createdAt || now,
+        updatedAt: now,
+      };
+
+      if (existingConv) {
+        await conversationTableClient.updateEntity(conversationEntity, 'Merge');
+      } else {
+        await conversationTableClient.createEntity(conversationEntity);
+      }
+
+      addLog('SUCCESS', 'Conversation Storage', 'Conversation saved to Azure Table Storage');
+    } catch (error: any) {
+      // Don't fail the request if conversation saving fails
+      addLog('WARN', 'Conversation Storage', `Failed to save conversation: ${error.message}`);
+    }
+
     return res.status(200).json({
       success: true,
       reply,
       logs,
+      conversationId: effectiveConversationId,
       metadata: {
         provider,
         model: providerConfig.model,
