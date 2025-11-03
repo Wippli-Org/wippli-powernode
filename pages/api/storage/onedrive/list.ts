@@ -73,8 +73,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Update the stored token
       const updatedEntity = {
-        partitionKey: entity.partitionKey,
-        rowKey: entity.rowKey,
+        partitionKey: entity.partitionKey as string,
+        rowKey: entity.rowKey as string,
         accessToken,
         refreshToken: tokenData.refresh_token || refreshToken,
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
