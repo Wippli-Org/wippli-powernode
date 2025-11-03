@@ -46,14 +46,17 @@ jobs:
           mkdir -p build
           cp -r .next/standalone/. build/
           cp -r .next/static build/.next/
-          cp -r public build/
+          mkdir -p build/public
+          cp -r public/. build/public/
           # Copy Word MCP server files (if they exist)
           if [ -d "mcp-servers" ]; then
             cp -r mcp-servers build/
             echo "✓ Copied MCP server files"
           fi
+          echo "✓ Build context prepared"
           ls -la build/
           ls -la build/.next/
+          ls -la build/public/ || echo "No public folder"
 
       - name: Log in to Azure
         uses: azure/login@v2
