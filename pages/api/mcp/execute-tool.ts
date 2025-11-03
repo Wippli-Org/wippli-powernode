@@ -32,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const serverUrl = serverEntity.url as string;
     const apiKey = serverEntity.apiKey as string | undefined;
+    const n8nServerUrl = serverEntity.n8nServerUrl as string | undefined;
 
     // Prepare MCP request
     const mcpRequest = {
@@ -53,9 +54,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    // Pass instance-specific n8n URL for n8n MCP servers
-    if (instanceConfig.n8n?.enabled && instanceConfig.n8n.apiUrl && serverUrl.includes('/mcp-server/n8n')) {
-      headers['X-N8n-Api-Url'] = instanceConfig.n8n.apiUrl;
+    // Pass n8n URL for n8n MCP servers (server-specific overrides instance-level)
+    if (serverUrl.includes('/mcp-server/n8n')) {
+      const effectiveN8nUrl = n8nServerUrl || instanceConfig.n8n?.apiUrl;
+      if (effectiveN8nUrl) {
+        headers['X-N8n-Api-Url'] = effectiveN8nUrl;
+      }
     }
 
     // Pass user_id and wippli_id for multi-tenant isolation

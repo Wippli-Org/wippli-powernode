@@ -132,7 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'PUT') {
     // Update existing MCP server
-    const { id, name, description, url, apiKey, tools, status, latency, uptime } = req.body;
+    const { id, name, description, url, apiKey, n8nServerUrl, tools, status, latency, uptime } = req.body;
 
     if (!id) {
       return res.status(400).json({ error: 'Missing server id' });
@@ -148,6 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: description !== undefined ? description : entity.description,
         url: url || entity.url,
         apiKey: apiKey !== undefined ? apiKey : entity.apiKey,
+        n8nServerUrl: n8nServerUrl !== undefined ? n8nServerUrl : entity.n8nServerUrl,
         tools: tools !== undefined ? JSON.stringify(tools) : entity.tools,
         status: status || entity.status,
         latency: latency !== undefined ? latency : entity.latency,

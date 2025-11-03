@@ -18,6 +18,7 @@ interface MCPServer {
   description: string;
   url: string;
   apiKey?: string;
+  n8nServerUrl?: string;  // For n8n MCP servers - the actual n8n instance URL
   status: 'healthy' | 'degraded' | 'down';
   latency: number;
   uptime: number;
@@ -76,6 +77,7 @@ export default function MCPToolsPage() {
   const [newServerDescription, setNewServerDescription] = useState('');
   const [newServerUrl, setNewServerUrl] = useState('');
   const [newServerApiKey, setNewServerApiKey] = useState('');
+  const [newN8nServerUrl, setNewN8nServerUrl] = useState('');
   const [newServerTools, setNewServerTools] = useState('[]');
 
   // Add Tool Form State
@@ -321,6 +323,7 @@ export default function MCPToolsPage() {
     setNewServerDescription(server.description);
     setNewServerUrl(server.url);
     setNewServerApiKey(server.apiKey || '');
+    setNewN8nServerUrl(server.n8nServerUrl || '');
     setNewServerTools(JSON.stringify(server.tools || [], null, 2));
     setShowEditServer(true);
   };
@@ -356,6 +359,7 @@ export default function MCPToolsPage() {
           description: newServerDescription,
           url: newServerUrl,
           apiKey: newServerApiKey || undefined,
+          n8nServerUrl: newN8nServerUrl || undefined,
           tools: parsedTools,
         }),
       });
@@ -371,6 +375,7 @@ export default function MCPToolsPage() {
                   description: newServerDescription,
                   url: newServerUrl,
                   apiKey: newServerApiKey || undefined,
+                  n8nServerUrl: newN8nServerUrl || undefined,
                   tools: parsedTools,
                 }
               : s
@@ -385,6 +390,7 @@ export default function MCPToolsPage() {
             description: newServerDescription,
             url: newServerUrl,
             apiKey: newServerApiKey || undefined,
+            n8nServerUrl: newN8nServerUrl || undefined,
             tools: parsedTools,
           });
         }
@@ -1011,6 +1017,24 @@ export default function MCPToolsPage() {
                 />
                 <p className="text-xs text-gray-500 mt-1">Leave blank to keep existing API key</p>
               </div>
+
+              {newServerUrl.includes('/mcp-server/n8n') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    n8n Server URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newN8nServerUrl}
+                    onChange={(e) => setNewN8nServerUrl(e.target.value)}
+                    placeholder="e.g., https://n8n.brannium.com/api/v1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    The actual n8n instance to connect to (overrides instance-level config)
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
