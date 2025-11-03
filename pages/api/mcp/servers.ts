@@ -11,6 +11,7 @@ interface MCPServer {
   description: string;
   url: string;
   apiKey?: string;
+  n8nServerUrl?: string;
   status: 'healthy' | 'degraded' | 'down';
   latency: number;
   uptime: number;
@@ -65,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           description: entity.description as string,
           url: entity.url as string,
           apiKey: entity.apiKey as string | undefined,
+          n8nServerUrl: entity.n8nServerUrl as string | undefined,
           status: (entity.status as 'healthy' | 'degraded' | 'down') || 'healthy',
           latency: (entity.latency as number) || 0,
           uptime: (entity.uptime as number) || 100,
