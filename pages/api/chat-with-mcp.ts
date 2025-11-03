@@ -269,6 +269,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       addLog('WARN', 'MCP Router', `Failed to load MCP servers: ${error.message}`);
     }
 
+    // Add built-in OneDrive storage tools if OneDrive is configured
+    try {
+      const onedriveTableClient = TableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, ONEDRIVE_TABLE_NAME);
+      const onedriveEntity = await onedriveTableClient.getEntity(effectiveUserId, 'onedrive-config');
+
+      if (onedriveEntity && onedriveEntity.accessToken) {
+        addLog('INFO', 'OneDrive Tools', 'Adding built-in OneDrive storage tools');
+
+        // Add OneDrive list files tool
+        tools.push({
+          name: 'onedrive__list_files',
+          description: 'List all files in the OneDrive root folder. Returns file names, IDs, sizes, and modification dates.',
+          input_schema: {
+            type: 'object',
+            properties: {},
+            required: []
+          },
+          _serverId: 'builtin-onedrive',
+          _originalName: 'list_files',
+        });
+
+        // Add OneDrive read file tool
+        tools.push({
+          name: 'onedrive__read_file',
+          description: 'Read the contents of a file from OneDrive. Provide the file ID obtained from list_files.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              fileId: {
+                type: 'string',
+                description: 'The OneDrive file ID'
+              }
+            },
+            required: ['fileId']
+          },
+          _serverId: 'builtin-onedrive',
+          _originalName: 'read_file',
+        });
+
+        addLog('SUCCESS', 'OneDrive Tools', 'Added 2 OneDrive storage tools');
+      }
+    } catch (error: any) {
+      // OneDrive not configured, skip adding tools
+      addLog('INFO', 'OneDrive Tools', 'OneDrive not configured, skipping storage tools');
+    }
+
     // Call REAL AI API
     addLog('INFO', 'AI Provider', `Using ${provider} provider`);
 
@@ -365,38 +411,77 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         addLog('INFO', 'MCP Executor', `Executing ${originalToolName} on ${serverId}`, { input: toolInput });
 
         try {
-          // Call our MCP execute-tool API
           const toolStartTime = Date.now();
+          let toolData: any;
 
-          // Prepare tool execution payload
-          const toolPayload: any = {
-            serverId,
-            toolName: originalToolName,
-            arguments: toolInput,
-            userId: creatorId,
-          };
+          // Handle built-in OneDrive tools directly
+          if (serverId === 'builtin-onedrive') {
+            if (originalToolName === 'list_files') {
+              // List OneDrive files
+              const listResponse = await fetch(`${req.headers.host?.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/storage/onedrive/list`);
+              const listData = await listResponse.json();
 
-          // Pass file information if available
-          if (fileMetadata) {
-            toolPayload.fileMetadata = fileMetadata;
-          }
+              toolData = {
+                success: true,
+                result: {
+                  content: JSON.stringify(listData.files || [], null, 2)
+                }
+              };
+            } else if (originalToolName === 'read_file') {
+              // Read OneDrive file
+              const fileId = toolInput.fileId;
+              const downloadResponse = await fetch(`${req.headers.host?.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/storage/onedrive/download?fileId=${fileId}`);
 
-          // Pass OneDrive config if file content was downloaded
-          if (fileContent && oneDriveConfig) {
-            toolPayload.storageConfig = {
-              provider: 'onedrive',
-              accessToken: oneDriveConfig.accessToken,
-              fileContent: fileContent.toString('base64'), // Convert to base64 for JSON transport
+              if (downloadResponse.ok) {
+                const fileBuffer = await downloadResponse.arrayBuffer();
+                const fileContent = Buffer.from(fileBuffer).toString('utf-8');
+
+                toolData = {
+                  success: true,
+                  result: {
+                    content: fileContent
+                  }
+                };
+              } else {
+                const errorData = await downloadResponse.json();
+                toolData = {
+                  success: false,
+                  error: errorData.error || 'Failed to read file'
+                };
+              }
+            }
+          } else {
+            // Call our MCP execute-tool API for external MCP servers
+            const toolPayload: any = {
+              serverId,
+              toolName: originalToolName,
+              arguments: toolInput,
+              userId: creatorId,
             };
+
+            // Pass file information if available
+            if (fileMetadata) {
+              toolPayload.fileMetadata = fileMetadata;
+            }
+
+            // Pass OneDrive config if file content was downloaded
+            if (fileContent && oneDriveConfig) {
+              toolPayload.storageConfig = {
+                provider: 'onedrive',
+                accessToken: oneDriveConfig.accessToken,
+                fileContent: fileContent.toString('base64'), // Convert to base64 for JSON transport
+              };
+            }
+
+            const toolResponse = await fetch(`${req.headers.host?.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/mcp/execute-tool`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(toolPayload),
+            });
+
+            toolData = await toolResponse.json();
           }
 
-          const toolResponse = await fetch(`${req.headers.host?.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/mcp/execute-tool`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(toolPayload),
-          });
-
-          const toolData = await toolResponse.json();
           const toolDuration = Date.now() - toolStartTime;
 
           if (toolData.success) {
