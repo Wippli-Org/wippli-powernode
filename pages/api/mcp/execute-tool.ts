@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { TableClient } from '@azure/data-tables';
+import { getInstanceConfig } from '../../../lib/instance-config';
 
 const POWERNODE_STORAGE_CONNECTION =
   process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
@@ -11,6 +12,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { serverId, toolName, arguments: toolArgs, userId = 'default-user' } = req.body;
+
+  // Get instance configuration for multi-instance support
+  const instanceConfig = getInstanceConfig();
 
   if (!serverId || !toolName) {
     return res.status(400).json({ error: 'Missing serverId or toolName' });
@@ -47,6 +51,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    // Pass instance-specific n8n URL for n8n MCP servers
+    if (instanceConfig.n8n?.enabled && instanceConfig.n8n.apiUrl && serverUrl.includes('/mcp-server/n8n')) {
+      headers['X-N8n-Api-Url'] = instanceConfig.n8n.apiUrl;
     }
 
     const startTime = Date.now();

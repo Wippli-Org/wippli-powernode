@@ -1,10 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
- * n8n MCP Server Endpoint - Full Toolset
+ * n8n MCP Server Endpoint - Full Toolset (Multi-Instance Support)
  *
  * This endpoint implements a comprehensive MCP (Model Context Protocol) server interface
  * for n8n workflow automation with access to ALL n8n API capabilities.
+ *
+ * Multi-Instance Support:
+ * - Each PowerNode instance can connect to a different n8n instance
+ * - n8n API URL can be provided via:
+ *   1. X-N8n-Api-Url header (highest priority, for instance-specific config)
+ *   2. N8N_API_URL environment variable (fallback)
  *
  * Usage: Configure this as your MCP server URL in the MCP Tools page:
  * https://your-domain.com/api/mcp-server/n8n
@@ -12,7 +18,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
  * The API key should be configured in the MCP Tools page and will be passed via Authorization header.
  */
 
-const N8N_API_URL = process.env.N8N_API_URL || 'https://n8n.brannium.com/api/v1';
+const DEFAULT_N8N_API_URL = process.env.N8N_API_URL || 'https://n8n.brannium.com/api/v1';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -22,6 +28,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Extract API key from Authorization header (sent by execute-tool API)
   const authHeader = req.headers.authorization;
   const n8nApiKey = authHeader?.replace('Bearer ', '');
+
+  // Support instance-specific n8n URL via custom header
+  const N8N_API_URL = (req.headers['x-n8n-api-url'] as string) || DEFAULT_N8N_API_URL;
 
   const { jsonrpc, id, method, params } = req.body;
 
