@@ -7,7 +7,7 @@ import { TableClient } from '@azure/data-tables';
 // Adobe PDF Services (optional - only if credentials provided)
 let adobeAvailable = false;
 let PDFServices: any = null;
-let Credentials: any = null;
+let ServicePrincipalCredentials: any = null;
 let ExtractPDFParams: any = null;
 let ExtractElementType: any = null;
 let ExtractPDFJob: any = null;
@@ -18,18 +18,15 @@ try {
   if (process.env.ADOBE_PDF_CLIENT_ID && process.env.ADOBE_PDF_CLIENT_SECRET) {
     console.log('Loading Adobe PDF Services SDK...');
     const adobeSDK = require('@adobe/pdfservices-node-sdk');
-    console.log('Adobe SDK loaded, keys:', Object.keys(adobeSDK).join(', '));
     PDFServices = adobeSDK.PDFServices;
-    Credentials = adobeSDK.Credentials;
+    ServicePrincipalCredentials = adobeSDK.ServicePrincipalCredentials;
     ExtractPDFParams = adobeSDK.ExtractPDFParams;
     ExtractElementType = adobeSDK.ExtractElementType;
     ExtractPDFJob = adobeSDK.ExtractPDFJob;
     ExtractPDFResult = adobeSDK.ExtractPDFResult;
     MimeType = adobeSDK.MimeType;
-    console.log('PDFServices:', typeof PDFServices);
-    console.log('Credentials:', typeof Credentials);
     adobeAvailable = true;
-    console.log('Adobe PDF Services enabled');
+    console.log('Adobe PDF Services SDK loaded successfully');
   }
 } catch (error: any) {
   console.log('Adobe PDF Services not available:', error.message);
@@ -87,22 +84,15 @@ function getPDFServicesClient() {
   if (!adobeAvailable) {
     throw new Error('Adobe PDF Services not configured');
   }
-  if (!Credentials || !PDFServices) {
+  if (!ServicePrincipalCredentials || !PDFServices) {
     throw new Error('Adobe SDK classes not loaded');
   }
   if (!pdfServicesClient) {
-    console.log('Creating Adobe PDF Services client...');
-    console.log('CLIENT_ID present:', !!process.env.ADOBE_PDF_CLIENT_ID);
-    console.log('CLIENT_SECRET present:', !!process.env.ADOBE_PDF_CLIENT_SECRET);
-    const credentials = Credentials
-      .servicePrincipalCredentialsBuilder()
-      .withClientId(process.env.ADOBE_PDF_CLIENT_ID!)
-      .withClientSecret(process.env.ADOBE_PDF_CLIENT_SECRET!)
-      .build();
+    const credentials = new ServicePrincipalCredentials({
+      clientId: process.env.ADOBE_PDF_CLIENT_ID!,
+      clientSecret: process.env.ADOBE_PDF_CLIENT_SECRET!
+    });
     pdfServicesClient = new PDFServices({ credentials });
-    console.log('Adobe PDF Services client created:', !!pdfServicesClient);
-    console.log('Client type:', typeof pdfServicesClient);
-    console.log('Client has upload method:', typeof pdfServicesClient?.upload);
   }
   if (!pdfServicesClient) {
     throw new Error('Failed to create PDF Services client');
