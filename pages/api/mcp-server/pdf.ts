@@ -83,7 +83,10 @@ function getPDFServicesClient() {
   if (!adobeAvailable) {
     throw new Error('Adobe PDF Services not configured');
   }
-  if (!pdfServicesClient && Credentials && PDFServices) {
+  if (!Credentials || !PDFServices) {
+    throw new Error('Adobe SDK classes not loaded');
+  }
+  if (!pdfServicesClient) {
     console.log('Creating Adobe PDF Services client...');
     console.log('CLIENT_ID present:', !!process.env.ADOBE_PDF_CLIENT_ID);
     console.log('CLIENT_SECRET present:', !!process.env.ADOBE_PDF_CLIENT_SECRET);
@@ -94,8 +97,12 @@ function getPDFServicesClient() {
       .build();
     pdfServicesClient = new PDFServices({ credentials });
     console.log('Adobe PDF Services client created:', !!pdfServicesClient);
+    console.log('Client type:', typeof pdfServicesClient);
+    console.log('Client has upload method:', typeof pdfServicesClient?.upload);
   }
-  console.log('Returning pdfServicesClient:', !!pdfServicesClient);
+  if (!pdfServicesClient) {
+    throw new Error('Failed to create PDF Services client');
+  }
   return pdfServicesClient;
 }
 
