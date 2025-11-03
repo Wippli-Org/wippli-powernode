@@ -3,11 +3,19 @@
  *
  * Allows PowerNode to work as independent instances with different configurations,
  * enabling embedding in n8n or other platforms with instance-specific settings.
+ *
+ * Multi-tenant isolation:
+ * - user_id: Global user-level isolation (preferences, personal configs)
+ * - wippli_id: Task/workflow-level isolation (workflows, executions, MCP operations)
  */
 
 export interface InstanceConfig {
   instanceId: string;
   instanceName: string;
+
+  // Multi-tenant Identifiers
+  userId?: string;      // Global user-level isolation
+  wippliId?: string;    // Task/workflow-level isolation
 
   // n8n Configuration
   n8n?: {
@@ -64,6 +72,10 @@ export function getInstanceConfig(): InstanceConfig {
   const config: InstanceConfig = {
     instanceId: urlConfig.instanceId || storedConfig?.instanceId || generateInstanceId(),
     instanceName: urlConfig.instanceName || storedConfig?.instanceName || 'Default Instance',
+
+    // Multi-tenant identifiers
+    userId: urlConfig.userId || storedConfig?.userId,
+    wippliId: urlConfig.wippliId || storedConfig?.wippliId,
 
     n8n: {
       apiUrl: urlConfig.n8nApiUrl || storedConfig?.n8n?.apiUrl || '',
@@ -135,6 +147,8 @@ function getConfigFromURL(): Partial<InstanceConfig> & {
   return {
     instanceId: getParam('instanceId') || undefined,
     instanceName: getParam('instanceName') || undefined,
+    userId: getParam('userId') || getParam('user_id') || undefined,
+    wippliId: getParam('wippliId') || getParam('wippli_id') || undefined,
     n8nApiUrl: getParam('n8nApiUrl') || getParam('n8n_api_url') || undefined,
     n8nApiKey: getParam('n8nApiKey') || getParam('n8n_api_key') || undefined,
     hideNavigation: getParam('hideNav') === 'true',
@@ -180,6 +194,47 @@ export function getInstanceStorageKey(baseKey: string): string {
 }
 
 /**
+ * Get user-specific storage key
+ * For global user-level data (preferences, personal configs)
+ */
+export function getUserStorageKey(baseKey: string): string {
+  const config = getInstanceConfig();
+  if (!config.userId) {
+    // Fallback to instance-level if no user_id
+    return getInstanceStorageKey(baseKey);
+  }
+  return `${baseKey}-user-${config.userId}`;
+}
+
+/**
+ * Get wippli-specific storage key
+ * For task/workflow-level data (workflows, executions, MCP operations)
+ */
+export function getWippliStorageKey(baseKey: string): string {
+  const config = getInstanceConfig();
+  if (!config.wippliId) {
+    // Fallback to instance-level if no wippli_id
+    return getInstanceStorageKey(baseKey);
+  }
+  return `${baseKey}-wippli-${config.wippliId}`;
+}
+
+/**
+ * Get combined user+wippli storage key
+ * For data that needs both user and wippli isolation
+ */
+export function getUserWippliStorageKey(baseKey: string): string {
+  const config = getInstanceConfig();
+  if (!config.userId && !config.wippliId) {
+    return getInstanceStorageKey(baseKey);
+  }
+  const parts = [baseKey];
+  if (config.userId) parts.push(`user-${config.userId}`);
+  if (config.wippliId) parts.push(`wippli-${config.wippliId}`);
+  return parts.join('-');
+}
+
+/**
  * Check if running in embedded mode (e.g., inside n8n)
  */
 export function isEmbeddedMode(): boolean {
@@ -214,6 +269,14 @@ export function exportConfigAsURL(config: InstanceConfig, baseUrl?: string): str
 
   url.searchParams.set('instanceId', config.instanceId);
   url.searchParams.set('instanceName', config.instanceName);
+
+  if (config.userId) {
+    url.searchParams.set('userId', config.userId);
+  }
+
+  if (config.wippliId) {
+    url.searchParams.set('wippliId', config.wippliId);
+  }
 
   if (config.n8n?.enabled && config.n8n.apiUrl && config.n8n.apiKey) {
     url.searchParams.set('n8nApiUrl', config.n8n.apiUrl);

@@ -19,6 +19,7 @@ import {
   GitBranch, Zap, RefreshCw, Clock, Globe, Code, Bug, CheckCircle, Copy,
   FileSearch, Languages, PlayCircle, TestTube, Database, Send, Loader, Clipboard
 } from 'lucide-react';
+import { getInstanceConfig, getWippliStorageKey } from '../lib/instance-config';
 
 // Instruction node types with icons and colors
 const INSTRUCTION_TYPES = {
@@ -200,9 +201,10 @@ export default function WorkflowsPage() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Load workflows from localStorage
+  // Load workflows from localStorage (wippli_id isolated)
   useEffect(() => {
-    const saved = localStorage.getItem('powernode-workflows-v2');
+    const storageKey = getWippliStorageKey('powernode-workflows-v2');
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
       const parsed = JSON.parse(saved);
       const workflowsWithDates = parsed.map((w: any) => ({
@@ -217,10 +219,11 @@ export default function WorkflowsPage() {
     }
   }, []);
 
-  // Save workflows to localStorage
+  // Save workflows to localStorage (wippli_id isolated)
   useEffect(() => {
     if (workflows.length > 0) {
-      localStorage.setItem('powernode-workflows-v2', JSON.stringify(workflows));
+      const storageKey = getWippliStorageKey('powernode-workflows-v2');
+      localStorage.setItem(storageKey, JSON.stringify(workflows));
     }
   }, [workflows]);
 
@@ -420,8 +423,9 @@ export default function WorkflowsPage() {
     addLogToNode(node.id, 'Sending to AI agent with full context...');
 
     try {
-      // Get wippli_id from localStorage
-      const wippli_id = localStorage.getItem('wippli_id') || 'default-user';
+      // Get wippli_id from instance configuration
+      const config = getInstanceConfig();
+      const wippli_id = config.wippliId || 'default-wippli';
 
       // Get or create conversation for workflow debugging
       const conversationId = `workflow-debug-${activeWorkflow?.id || 'unknown'}`;

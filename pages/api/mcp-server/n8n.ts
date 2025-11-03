@@ -20,6 +20,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 const DEFAULT_N8N_API_URL = process.env.N8N_API_URL || 'https://n8n.brannium.com/api/v1';
 
+// Module-scoped variable that gets set per request (simpler than passing everywhere)
+let N8N_API_URL = DEFAULT_N8N_API_URL;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -29,8 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const authHeader = req.headers.authorization;
   const n8nApiKey = authHeader?.replace('Bearer ', '');
 
-  // Support instance-specific n8n URL via custom header
-  const N8N_API_URL = (req.headers['x-n8n-api-url'] as string) || DEFAULT_N8N_API_URL;
+  // Support instance-specific n8n URL via custom header - set module variable
+  N8N_API_URL = (req.headers['x-n8n-api-url'] as string) || DEFAULT_N8N_API_URL;
 
   const { jsonrpc, id, method, params } = req.body;
 

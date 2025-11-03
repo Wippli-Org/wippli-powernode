@@ -58,6 +58,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers['X-N8n-Api-Url'] = instanceConfig.n8n.apiUrl;
     }
 
+    // Pass user_id and wippli_id for multi-tenant isolation
+    if (instanceConfig.userId) {
+      headers['X-User-Id'] = instanceConfig.userId;
+    }
+    if (instanceConfig.wippliId) {
+      headers['X-Wippli-Id'] = instanceConfig.wippliId;
+    }
+
     const startTime = Date.now();
 
     // Call MCP server
