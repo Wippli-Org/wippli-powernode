@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { TableClient } from '@azure/data-tables';
 
 interface LogEntry {
   timestamp: string;
@@ -7,6 +8,10 @@ interface LogEntry {
   message: string;
   details?: any;
 }
+
+const POWERNODE_STORAGE_CONNECTION =
+  process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
+const ONEDRIVE_TABLE_NAME = 'powernodeOneDriveConfig';
 
 // MCP Gateway URL - disabled to prevent network interference
 // const MCP_GATEWAY_URL = 'https://wippli-power-mcp.victoriousocean-8ee46cea.australiaeast.azurecontainerapps.io';
@@ -24,7 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     fileId,
     driveId,
     storageProvider,
-    oneDriveConfig,
     conversationId,
     userId,
     wippliId,
@@ -58,6 +62,76 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // OneDrive File Access - Download file if provided
     let fileContent: Buffer | null = null;
     let fileMetadata: any = null;
+    let oneDriveConfig: any = null;
+
+    // Retrieve OneDrive credentials from Azure Table Storage if needed
+    if (storageProvider === 'onedrive' && fileId && POWERNODE_STORAGE_CONNECTION) {
+      addLog('INFO', 'OneDrive Config', 'Retrieving OneDrive credentials from storage');
+
+      try {
+        const tableClient = TableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, ONEDRIVE_TABLE_NAME);
+        const entity = await tableClient.getEntity(effectiveUserId, 'onedrive-config');
+
+        oneDriveConfig = {
+          accessToken: entity.accessToken as string,
+          refreshToken: entity.refreshToken as string,
+          expiresAt: entity.expiresAt as string,
+        };
+
+        // Check if token is expired and refresh if needed
+        if (oneDriveConfig.expiresAt && new Date(oneDriveConfig.expiresAt) <= new Date()) {
+          addLog('WARN', 'OneDrive Config', 'Access token expired, attempting to refresh');
+
+          // Refresh the token
+          const tenantId = entity.tenantId as string;
+          const clientId = entity.clientId as string;
+          const clientSecret = entity.clientSecret as string;
+          const scopes = entity.scopes as string;
+
+          const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+          const tokenResponse = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: oneDriveConfig.refreshToken,
+              grant_type: 'refresh_token',
+              scope: scopes,
+            }),
+          });
+
+          if (tokenResponse.ok) {
+            const tokenData = await tokenResponse.json();
+            oneDriveConfig.accessToken = tokenData.access_token;
+
+            // Update the stored token
+            const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+            await tableClient.updateEntity({
+              partitionKey: effectiveUserId,
+              rowKey: 'onedrive-config',
+              accessToken: tokenData.access_token,
+              refreshToken: tokenData.refresh_token || oneDriveConfig.refreshToken,
+              expiresAt,
+            }, 'Merge');
+
+            addLog('SUCCESS', 'OneDrive Config', 'Access token refreshed successfully');
+          } else {
+            throw new Error('Failed to refresh OneDrive access token');
+          }
+        } else {
+          addLog('SUCCESS', 'OneDrive Config', 'OneDrive credentials retrieved successfully');
+        }
+      } catch (error: any) {
+        addLog('ERROR', 'OneDrive Config', `Failed to retrieve OneDrive credentials: ${error.message}`);
+        return res.status(500).json({
+          error: 'OneDrive credentials not configured. Please configure OneDrive in settings.',
+          logs,
+        });
+      }
+    }
 
     if (storageProvider === 'onedrive' && oneDriveConfig?.accessToken && fileId) {
       addLog('INFO', 'OneDrive Storage', `Downloading file from OneDrive...`, { fileId, fileName });

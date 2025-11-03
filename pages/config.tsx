@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check, Send, MessageSquare } from 'lucide-react';
+import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check, Send, MessageSquare, Cloud } from 'lucide-react';
+import OneDriveConfigModal from '../components/OneDriveConfigModal';
 
 interface AIProvider {
   enabled: boolean;
@@ -74,6 +75,7 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showOneDriveModal, setShowOneDriveModal] = useState(false);
 
   // Dynamic models state
   const [providerModels, setProviderModels] = useState<Record<string, any[]>>({});
@@ -494,6 +496,27 @@ export default function ConfigPage() {
           </div>
         </div>
 
+        {/* OneDrive Configuration */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Cloud className="w-6 h-6 text-primary" />
+                <h2 className="text-xl font-semibold text-gray-900">OneDrive Configuration</h2>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                Configure OneDrive OAuth credentials for file operations
+              </p>
+            </div>
+            <button
+              onClick={() => setShowOneDriveModal(true)}
+              className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              Configure OneDrive
+            </button>
+          </div>
+        </div>
+
         {/* Custom System Prompts */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Custom System Prompts (Optional)</h2>
@@ -617,6 +640,13 @@ export default function ConfigPage() {
             )}
           </button>
         </div>
+
+        {/* OneDrive Configuration Modal */}
+        <OneDriveConfigModal
+          isOpen={showOneDriveModal}
+          onClose={() => setShowOneDriveModal(false)}
+          userId="default-user"
+        />
       </div>
     </div>
   );
