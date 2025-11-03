@@ -12,9 +12,11 @@
     "pre-deploy": "npm run type-check && npm run build"
   },
   "dependencies": {
+    "@adobe/pdfservices-node-sdk": "^4.1.0",
     "@anthropic-ai/sdk": "^0.68.0",
     "@azure/data-tables": "^13.3.1",
     "@azure/storage-blob": "^12.29.1",
+    "adm-zip": "^0.5.16",
     "date-fns": "^3.3.1",
     "docx": "^9.5.1",
     "exceljs": "^4.4.0",
@@ -23,6 +25,7 @@
     "mammoth": "^1.11.0",
     "next": "^14.2.0",
     "node-fetch": "^3.3.2",
+    "pdf-lib": "^1.17.1",
     "pptxgenjs": "^4.0.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
