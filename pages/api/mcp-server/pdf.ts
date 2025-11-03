@@ -524,6 +524,7 @@ async function extractText(args: any): Promise<string> {
 async function extractTextAdobe(filename: string): Promise<string> {
   const fs = require('fs');
   const path = require('path');
+  const os = require('os');
   const AdmZip = require('adm-zip');
 
   const blobClient = getBlobClient();
@@ -533,8 +534,9 @@ async function extractTextAdobe(filename: string): Promise<string> {
   const download = await blob.download();
   const buffer = await streamToBuffer(download.readableStreamBody!);
 
-  const tempInput = path.join('/tmp', `input_${Date.now()}.pdf`);
-  const tempOutput = path.join('/tmp', `output_${Date.now()}.zip`);
+  const tempDir = os.tmpdir();
+  const tempInput = path.join(tempDir, `input_${Date.now()}.pdf`);
+  const tempOutput = path.join(tempDir, `output_${Date.now()}.zip`);
 
   fs.writeFileSync(tempInput, buffer);
 
