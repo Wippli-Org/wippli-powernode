@@ -1,0 +1,42 @@
+[
+  {
+    "id": "wippli-word-engine",
+    "name": "Word MCP Server",
+    "description": "Microsoft Word document manipulation with 25 professional tools",
+    "url": "https://wippli-word-engine.agreeablemushroom-48fcffb3.australiaeast.azurecontainerapps.io",
+    "status": "healthy",
+    "latency": 0,
+    "uptime": 100,
+    "tools": []
+  },
+  {
+    "id": "wippli-excel-engine",
+    "name": "Excel MCP Server",
+    "description": "Microsoft Excel workbook manipulation with 25 professional tools",
+    "url": "https://wippli-excel-engine.agreeablemushroom-48fcffb3.australiaeast.azurecontainerapps.io",
+    "status": "healthy",
+    "latency": 0,
+    "uptime": 100,
+    "tools": []
+  },
+  {
+    "id": "wippli-powerpoint-engine",
+    "name": "PowerPoint MCP Server",
+    "description": "Microsoft PowerPoint presentation manipulation with 25 professional tools",
+    "url": "https://wippli-powerpoint-engine.agreeablemushroom-48fcffb3.australiaeast.azurecontainerapps.io",
+    "status": "healthy",
+    "latency": 0,
+    "uptime": 100,
+    "tools": []
+  },
+  {
+    "id": "wippli-pdf-generator",
+    "name": "PDF MCP Server",
+    "description": "Comprehensive PDF manipulation with 25 professional tools using official libraries (PDF.js + PDF-lib)",
+    "url": "https://wippli-pdf-generator.agreeablemushroom-48fcffb3.australiaeast.azurecontainerapps.io",
+    "status": "healthy",
+    "latency": 0,
+    "uptime": 100,
+    "tools": []
+  }
+]

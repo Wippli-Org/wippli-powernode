@@ -1,0 +1,687 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { BlobServiceClient } from '@azure/storage-blob';
+import Anthropic from '@anthropic-ai/sdk';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+
+// PDF.js requires canvas polyfills - we'll import it dynamically when needed
+let pdfjsLib: any = null;
+let canvasPolyfillsSetup = false;
+
+async function setupCanvasPolyfills() {
+  if (canvasPolyfillsSetup) return;
+
+  try {
+    // Import canvas to provide DOM polyfills
+    const canvas = await import('canvas');
+
+    // Set up global canvas polyfills for PDF.js
+    if (typeof global !== 'undefined') {
+      // @ts-ignore
+      global.DOMMatrix = canvas.DOMMatrix || function DOMMatrix() { return {a: 1, b: 0, c: 0, d: 1, e: 0, f: 0}; };
+      // @ts-ignore
+      global.Path2D = canvas.Path2D || function Path2D() { return {}; };
+      // @ts-ignore
+      global.ImageData = canvas.ImageData || function ImageData(data: any, width: number, height: number) {
+        return { data, width, height };
+      };
+      // @ts-ignore
+      global.CanvasRenderingContext2D = canvas.CanvasRenderingContext2D || function() { return {}; };
+    }
+
+    canvasPolyfillsSetup = true;
+  } catch (error) {
+    console.warn('Canvas polyfills setup failed:', error);
+    canvasPolyfillsSetup = true; // Mark as setup to avoid repeated attempts
+  }
+}
+
+async function getPDFJS() {
+  if (!pdfjsLib) {
+    // Setup canvas polyfills before importing PDF.js
+    await setupCanvasPolyfills();
+
+    // Now dynamically import PDF.js
+    pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  }
+  return pdfjsLib;
+}
+
+/**
+ * PDF MCP Server - Pure TypeScript Implementation
+ *
+ * Following Word/Excel/PowerPoint MCP pattern - no child processes, clean JSON-RPC 2.0
+ *
+ * COMPREHENSIVE 10-TOOL SUITE:
+ *
+ * READING & EXTRACTION:
+ * 1. read_pdf - Read and extract text, images, and metadata from PDF
+ * 2. extract_text - Extract text content from PDF
+ * 3. get_pdf_info - Get comprehensive PDF information (pages, size, metadata)
+ *
+ * DOCUMENT MANAGEMENT:
+ * 4. list_pdfs - List all PDF documents in blob storage
+ * 5. delete_pdf - Delete PDF from blob storage
+ * 6. get_pdf_url - Get temporary download URLs (1 hour expiry)
+ *
+ * CREATION & MANIPULATION:
+ * 7. create_pdf - Create new PDF documents with text and formatting
+ * 8. merge_pdfs - Merge multiple PDF documents into one
+ * 9. split_pdf - Split PDF into multiple files by page ranges
+ *
+ * AI-POWERED:
+ * 10. analyze_pdf - Use AI to analyze PDF content with Claude
+ */
+
+// Initialize clients (lazy loaded)
+let blobServiceClient: BlobServiceClient | null = null;
+let anthropicClient: Anthropic | null = null;
+
+function getBlobClient() {
+  if (!blobServiceClient) {
+    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    if (!connectionString) {
+      throw new Error('AZURE_STORAGE_CONNECTION_STRING environment variable not set');
+    }
+    blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+  }
+  return blobServiceClient;
+}
+
+function getAnthropicClient() {
+  if (!anthropicClient) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY environment variable not set');
+    }
+    anthropicClient = new Anthropic({ apiKey });
+  }
+  return anthropicClient;
+}
+
+// Container name
+const CONTAINER_NAME = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+
+// Tool definitions
+const TOOLS = [
+  {
+    name: 'read_pdf',
+    description: 'Read and extract text, images, and metadata from a PDF file',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'PDF filename to read' },
+        pages: { type: 'string', description: 'Page range (e.g., "1-5" or "all")' },
+        extractImages: { type: 'boolean', description: 'Extract images from PDF' },
+        extractMetadata: { type: 'boolean', description: 'Extract PDF metadata' },
+      },
+      required: ['filename'],
+    },
+  },
+  {
+    name: 'extract_text',
+    description: 'Extract text content from a PDF',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'PDF filename' },
+        pages: { type: 'string', description: 'Page range (e.g., "1-5" or "all")' },
+      },
+      required: ['filename'],
+    },
+  },
+  {
+    name: 'get_pdf_info',
+    description: 'Get comprehensive information about a PDF (pages, size, metadata)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'PDF filename' },
+      },
+      required: ['filename'],
+    },
+  },
+  {
+    name: 'list_pdfs',
+    description: 'List all PDF documents in blob storage',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string', description: 'Filter by filename prefix (optional)' },
+      },
+    },
+  },
+  {
+    name: 'delete_pdf',
+    description: 'Delete a PDF from blob storage',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'PDF filename to delete' },
+      },
+      required: ['filename'],
+    },
+  },
+  {
+    name: 'get_pdf_url',
+    description: 'Get a temporary download URL for a PDF (1-hour validity)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'PDF filename' },
+      },
+      required: ['filename'],
+    },
+  },
+  {
+    name: 'create_pdf',
+    description: 'Create a new PDF document with text and formatting',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'Output PDF filename' },
+        title: { type: 'string', description: 'PDF title (metadata)' },
+        author: { type: 'string', description: 'PDF author (metadata)' },
+        content: {
+          type: 'array',
+          description: 'Array of content elements',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['text', 'heading', 'pageBreak'] },
+              text: { type: 'string' },
+              fontSize: { type: 'number' },
+              bold: { type: 'boolean' },
+            },
+          },
+        },
+      },
+      required: ['filename', 'content'],
+    },
+  },
+  {
+    name: 'merge_pdfs',
+    description: 'Merge multiple PDF documents into one',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceFilenames: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of source PDF filenames to merge',
+        },
+        targetFilename: { type: 'string', description: 'Output merged PDF filename' },
+      },
+      required: ['sourceFilenames', 'targetFilename'],
+    },
+  },
+  {
+    name: 'split_pdf',
+    description: 'Split a PDF into multiple files by page ranges',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'Source PDF filename' },
+        splits: {
+          type: 'array',
+          description: 'Array of split definitions',
+          items: {
+            type: 'object',
+            properties: {
+              outputFilename: { type: 'string' },
+              pageRange: { type: 'string', description: 'e.g., "1-5"' },
+            },
+          },
+        },
+      },
+      required: ['filename', 'splits'],
+    },
+  },
+  {
+    name: 'analyze_pdf',
+    description: 'Use AI (Claude) to analyze PDF content',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'PDF filename to analyze' },
+        prompt: { type: 'string', description: 'Analysis prompt/question' },
+        pages: { type: 'string', description: 'Page range to analyze (optional)' },
+      },
+      required: ['filename', 'prompt'],
+    },
+  },
+];
+
+// JSON-RPC 2.0 handler
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { jsonrpc, id, method, params } = req.body;
+
+  if (jsonrpc !== '2.0') {
+    return res.status(400).json({
+      jsonrpc: '2.0',
+      id,
+      error: { code: -32600, message: 'Invalid Request' },
+    });
+  }
+
+  try {
+    // Handle JSON-RPC methods
+    if (method === 'tools/list') {
+      return res.status(200).json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          tools: TOOLS,
+        },
+      });
+    }
+
+    if (method === 'tools/call') {
+      const { name, arguments: args } = params;
+      let result;
+
+      switch (name) {
+        case 'read_pdf':
+          result = await handleReadPdf(args);
+          break;
+        case 'extract_text':
+          result = await handleExtractText(args);
+          break;
+        case 'get_pdf_info':
+          result = await handleGetPdfInfo(args);
+          break;
+        case 'list_pdfs':
+          result = await handleListPdfs(args);
+          break;
+        case 'delete_pdf':
+          result = await handleDeletePdf(args);
+          break;
+        case 'get_pdf_url':
+          result = await handleGetPdfUrl(args);
+          break;
+        case 'create_pdf':
+          result = await handleCreatePdf(args);
+          break;
+        case 'merge_pdfs':
+          result = await handleMergePdfs(args);
+          break;
+        case 'split_pdf':
+          result = await handleSplitPdf(args);
+          break;
+        case 'analyze_pdf':
+          result = await handleAnalyzePdf(args);
+          break;
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+
+      return res.status(200).json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          content: [{ type: 'text', text: result }],
+        },
+      });
+    }
+
+    throw new Error(`Unknown method: ${method}`);
+  } catch (error: any) {
+    console.error('PDF MCP Server Error:', error);
+    return res.status(500).json({
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: -32000,
+        message: error.message || 'Internal server error',
+      },
+    });
+  }
+}
+
+// Tool implementation: read_pdf
+async function handleReadPdf(args: any): Promise<string> {
+  const { filename, extractMetadata = true } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+
+  // Download PDF
+  const downloadResponse = await blobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error(`Failed to download blob: ${filename}`);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of downloadResponse.readableStreamBody) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+
+  // Load PDF with PDF.js
+  const loadingTask = pdfjsLib.getDocument({ data: buffer });
+  const pdfDoc = await loadingTask.promise;
+
+  const numPages = pdfDoc.numPages;
+  let text = '';
+
+  // Extract text from all pages
+  for (let i = 1; i <= numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(' ');
+    text += `\n--- Page ${i} ---\n${pageText}`;
+  }
+
+  let metadata = {};
+  if (extractMetadata) {
+    const info = await pdfDoc.getMetadata();
+    metadata = info.info;
+  }
+
+  return JSON.stringify(
+    {
+      filename,
+      numPages,
+      text: text.trim(),
+      metadata,
+    },
+    null,
+    2
+  );
+}
+
+// Tool implementation: extract_text
+async function handleExtractText(args: any): Promise<string> {
+  const { filename, pages = 'all' } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+
+  // Download PDF
+  const downloadResponse = await blobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error(`Failed to download blob: ${filename}`);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of downloadResponse.readableStreamBody) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+
+  // Load PDF with PDF.js
+  const loadingTask = pdfjsLib.getDocument({ data: buffer });
+  const pdfDoc = await loadingTask.promise;
+
+  let text = '';
+  const numPages = pdfDoc.numPages;
+
+  for (let i = 1; i <= numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(' ');
+    text += pageText + '\n\n';
+  }
+
+  return text.trim();
+}
+
+// Tool implementation: get_pdf_info
+async function handleGetPdfInfo(args: any): Promise<string> {
+  const { filename } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+
+  // Download PDF
+  const downloadResponse = await blobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error(`Failed to download blob: ${filename}`);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of downloadResponse.readableStreamBody) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+
+  // Load PDF with PDF.js
+  const loadingTask = pdfjsLib.getDocument({ data: buffer });
+  const pdfDoc = await loadingTask.promise;
+  const metadata = await pdfDoc.getMetadata();
+
+  return JSON.stringify(
+    {
+      filename,
+      numPages: pdfDoc.numPages,
+      fileSize: buffer.length,
+      fileSizeFormatted: `${(buffer.length / 1024).toFixed(2)} KB`,
+      metadata: metadata.info,
+    },
+    null,
+    2
+  );
+}
+
+// Tool implementation: list_pdfs
+async function handleListPdfs(args: any): Promise<string> {
+  const { prefix } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const pdfs: string[] = [];
+
+  for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+    if (blob.name.endsWith('.pdf')) {
+      pdfs.push(blob.name);
+    }
+  }
+
+  return JSON.stringify(pdfs, null, 2);
+}
+
+// Tool implementation: delete_pdf
+async function handleDeletePdf(args: any): Promise<string> {
+  const { filename } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+  await blobClient.delete();
+
+  return `Successfully deleted: ${filename}`;
+}
+
+// Tool implementation: get_pdf_url
+async function handleGetPdfUrl(args: any): Promise<string> {
+  const { filename } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+
+  // Return the blob URL (Note: requires container to be public or use SAS token separately)
+  return blobClient.url;
+}
+
+// Tool implementation: create_pdf
+async function handleCreatePdf(args: any): Promise<string> {
+  const { filename, title, author, content } = args;
+
+  const pdfDoc = await PDFDocument.create();
+  if (title) pdfDoc.setTitle(title);
+  if (author) pdfDoc.setAuthor(author);
+
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  let page = pdfDoc.addPage();
+  const { width, height } = page.getSize();
+  let yPosition = height - 50;
+
+  for (const element of content) {
+    if (element.type === 'pageBreak') {
+      page = pdfDoc.addPage();
+      yPosition = height - 50;
+      continue;
+    }
+
+    if (element.type === 'text' || element.type === 'heading') {
+      const fontSize = element.fontSize || (element.type === 'heading' ? 18 : 12);
+      const currentFont = element.bold ? boldFont : font;
+
+      page.drawText(element.text, {
+        x: 50,
+        y: yPosition,
+        size: fontSize,
+        font: currentFont,
+        color: rgb(0, 0, 0),
+      });
+
+      yPosition -= fontSize + 10;
+
+      if (yPosition < 50) {
+        page = pdfDoc.addPage();
+        yPosition = height - 50;
+      }
+    }
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+
+  // Upload to blob storage
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(pdfFilename);
+  await blobClient.upload(Buffer.from(pdfBytes), pdfBytes.length, {
+    blobHTTPHeaders: { blobContentType: 'application/pdf' },
+  });
+
+  return `PDF created successfully: ${pdfFilename}`;
+}
+
+// Tool implementation: merge_pdfs
+async function handleMergePdfs(args: any): Promise<string> {
+  const { sourceFilenames, targetFilename } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+
+  const mergedPdf = await PDFDocument.create();
+
+  for (const sourceFile of sourceFilenames) {
+    const blobClient = containerClient.getBlockBlobClient(sourceFile);
+    const downloadResponse = await blobClient.download();
+
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error(`Failed to download blob: ${sourceFile}`);
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of downloadResponse.readableStreamBody) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const buffer = Buffer.concat(chunks);
+
+    const pdf = await PDFDocument.load(buffer);
+    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    copiedPages.forEach((page) => mergedPdf.addPage(page));
+  }
+
+  const mergedBytes = await mergedPdf.save();
+  const targetFile = targetFilename.endsWith('.pdf') ? targetFilename : `${targetFilename}.pdf`;
+
+  // Upload merged PDF
+  const blobClient = containerClient.getBlockBlobClient(targetFile);
+  await blobClient.upload(Buffer.from(mergedBytes), mergedBytes.length, {
+    blobHTTPHeaders: { blobContentType: 'application/pdf' },
+  });
+
+  return `Merged ${sourceFilenames.length} PDFs into ${targetFile}`;
+}
+
+// Tool implementation: split_pdf
+async function handleSplitPdf(args: any): Promise<string> {
+  const { filename, splits } = args;
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+
+  // Download source PDF
+  const downloadResponse = await blobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error(`Failed to download blob: ${filename}`);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of downloadResponse.readableStreamBody) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+
+  const sourcePdf = await PDFDocument.load(buffer);
+  const results: string[] = [];
+
+  for (const split of splits) {
+    const { outputFilename, pageRange } = split;
+    const [start, end] = pageRange.split('-').map((n: string) => parseInt(n.trim(), 10));
+
+    const newPdf = await PDFDocument.create();
+    const pagesToCopy = Array.from({ length: end - start + 1 }, (_, i) => start - 1 + i);
+    const copiedPages = await newPdf.copyPages(sourcePdf, pagesToCopy);
+    copiedPages.forEach((page) => newPdf.addPage(page));
+
+    const newPdfBytes = await newPdf.save();
+    const outputFile = outputFilename.endsWith('.pdf') ? outputFilename : `${outputFilename}.pdf`;
+
+    // Upload split PDF
+    const outputBlobClient = containerClient.getBlockBlobClient(outputFile);
+    await outputBlobClient.upload(Buffer.from(newPdfBytes), newPdfBytes.length, {
+      blobHTTPHeaders: { blobContentType: 'application/pdf' },
+    });
+
+    results.push(outputFile);
+  }
+
+  return `Split PDF into ${results.length} files: ${results.join(', ')}`;
+}
+
+// Tool implementation: analyze_pdf
+async function handleAnalyzePdf(args: any): Promise<string> {
+  const anthropic = getAnthropicClient();
+  const { filename, prompt, pages = 'all' } = args;
+
+  const containerClient = getBlobClient().getContainerClient(CONTAINER_NAME);
+  const blobClient = containerClient.getBlockBlobClient(filename);
+
+  // Download PDF
+  const downloadResponse = await blobClient.download();
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error(`Failed to download blob: ${filename}`);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of downloadResponse.readableStreamBody) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+
+  // Load PDF with PDF.js and extract text
+  const loadingTask = pdfjsLib.getDocument({ data: buffer });
+  const pdfDoc = await loadingTask.promise;
+
+  let text = '';
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(' ');
+    text += pageText + '\n\n';
+  }
+
+  // Send to Claude for analysis
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    messages: [
+      {
+        role: 'user',
+        content: `${prompt}\n\nPDF Content:\n${text}`,
+      },
+    ],
+  });
+
+  const result = message.content[0].type === 'text' ? message.content[0].text : '';
+
+  return result;
+}

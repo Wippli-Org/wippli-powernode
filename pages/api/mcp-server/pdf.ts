@@ -84,13 +84,18 @@ function getPDFServicesClient() {
     throw new Error('Adobe PDF Services not configured');
   }
   if (!pdfServicesClient && Credentials && PDFServices) {
+    console.log('Creating Adobe PDF Services client...');
+    console.log('CLIENT_ID present:', !!process.env.ADOBE_PDF_CLIENT_ID);
+    console.log('CLIENT_SECRET present:', !!process.env.ADOBE_PDF_CLIENT_SECRET);
     const credentials = Credentials
       .servicePrincipalCredentialsBuilder()
       .withClientId(process.env.ADOBE_PDF_CLIENT_ID!)
       .withClientSecret(process.env.ADOBE_PDF_CLIENT_SECRET!)
       .build();
     pdfServicesClient = new PDFServices({ credentials });
+    console.log('Adobe PDF Services client created:', !!pdfServicesClient);
   }
+  console.log('Returning pdfServicesClient:', !!pdfServicesClient);
   return pdfServicesClient;
 }
 
