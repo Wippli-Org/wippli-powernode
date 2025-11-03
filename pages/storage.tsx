@@ -87,6 +87,7 @@ export default function StoragePage() {
           ...prev,
           [activeTab]: {
             ...prev[activeTab],
+            enabled: data.enabled !== undefined ? data.enabled : prev[activeTab].enabled,
             connected: data.connected,
             totalSize: data.totalSize,
             usedSize: data.usedSize,
@@ -368,7 +369,7 @@ export default function StoragePage() {
               <p className="text-yellow-800 font-medium">Not Connected</p>
               <p className="text-yellow-700 text-sm">
                 {activeTab === 'blob' && 'Azure Blob Storage credentials not configured. Please check your environment variables.'}
-                {activeTab === 'onedrive' && 'OneDrive integration not yet implemented. Coming soon!'}
+                {activeTab === 'onedrive' && 'OneDrive credentials not configured. Please go to Config page and configure OneDrive OAuth credentials.'}
                 {activeTab === 'googledrive' && 'Google Drive integration not yet implemented. Coming soon!'}
               </p>
             </div>
