@@ -1,0 +1,228 @@
+[
+  {
+    "name": "create_pdf",
+    "description": "Create a new PDF document with text and formatting",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename (without .pdf)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Document title (optional)"
+        },
+        "author": {
+          "type": "string",
+          "description": "Document author (optional)"
+        },
+        "content": {
+          "type": "string",
+          "description": "Initial text content (optional)"
+        }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "get_pdf_info",
+    "description": "Get PDF metadata (pages, size, author, etc.)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename (.pdf file)"
+        }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "list_pdfs",
+    "description": "List all PDF files in storage",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "description": "Optional filename prefix filter"
+        }
+      }
+    }
+  },
+  {
+    "name": "delete_pdf",
+    "description": "Delete a PDF from storage",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename to delete"
+        }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "get_pdf_url",
+    "description": "Get temporary download URL (1 hour)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename"
+        }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "copy_pdf",
+    "description": "Copy/duplicate a PDF",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sourceFilename": {
+          "type": "string",
+          "description": "Source PDF"
+        },
+        "targetFilename": {
+          "type": "string",
+          "description": "Target PDF (without .pdf)"
+        }
+      },
+      "required": ["sourceFilename", "targetFilename"]
+    }
+  },
+  {
+    "name": "merge_pdfs",
+    "description": "Merge multiple PDFs into one",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sourceFilenames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of PDF filenames to merge"
+        },
+        "targetFilename": {
+          "type": "string",
+          "description": "Target PDF (without .pdf)"
+        }
+      },
+      "required": ["sourceFilenames", "targetFilename"]
+    }
+  },
+  {
+    "name": "split_pdf",
+    "description": "Split PDF by page range",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sourceFilename": {
+          "type": "string",
+          "description": "Source PDF"
+        },
+        "targetFilename": {
+          "type": "string",
+          "description": "Target PDF (without .pdf)"
+        },
+        "startPage": {
+          "type": "number",
+          "description": "Start page (1-indexed)"
+        },
+        "endPage": {
+          "type": "number",
+          "description": "End page (1-indexed)"
+        }
+      },
+      "required": ["sourceFilename", "targetFilename", "startPage", "endPage"]
+    }
+  },
+  {
+    "name": "add_text",
+    "description": "Add text to existing PDF",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text to add"
+        },
+        "pageNumber": {
+          "type": "number",
+          "description": "Page number (1-indexed)"
+        },
+        "x": {
+          "type": "number",
+          "description": "X coordinate (default: 50)"
+        },
+        "y": {
+          "type": "number",
+          "description": "Y coordinate (default: 50)"
+        },
+        "fontSize": {
+          "type": "number",
+          "description": "Font size (default: 12)"
+        }
+      },
+      "required": ["filename", "text"]
+    }
+  },
+  {
+    "name": "read_pdf",
+    "description": "Read PDF content and metadata",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename"
+        }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "extract_text",
+    "description": "Extract text from PDF (AI-powered if Adobe available)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename"
+        }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "analyze_pdf",
+    "description": "AI-powered PDF analysis with Claude",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": {
+          "type": "string",
+          "description": "PDF filename"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Analysis request"
+        }
+      },
+      "required": ["filename", "prompt"]
+    }
+  }
+]
