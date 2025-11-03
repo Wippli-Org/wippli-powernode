@@ -73,10 +73,37 @@ export default function StoragePage() {
     },
   });
 
+  // Check all provider statuses on initial mount
+  useEffect(() => {
+    checkAllProviders();
+  }, []);
+
   useEffect(() => {
     loadFiles();
     checkConnections();
   }, [activeTab]);
+
+  const checkAllProviders = async () => {
+    const types: StorageType[] = ['blob', 'onedrive', 'googledrive'];
+    for (const type of types) {
+      try {
+        const response = await fetch(`/api/storage/${type}/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setProviders(prev => ({
+            ...prev,
+            [type]: {
+              ...prev[type],
+              enabled: data.enabled !== undefined ? data.enabled : prev[type].enabled,
+              connected: data.connected,
+            }
+          }));
+        }
+      } catch (err) {
+        console.error(`Failed to check ${type} connection:`, err);
+      }
+    }
+  };
 
   const checkConnections = async () => {
     try {
