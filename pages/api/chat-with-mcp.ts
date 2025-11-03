@@ -185,10 +185,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     addLog('INFO', 'Config Loader', 'Loading AI provider configuration...');
 
     // Import config handler directly to get unmasked keys (server-side only)
-    const { TableClient } = await import('@azure/data-tables');
+    const { TableClient: ConfigTableClient } = await import('@azure/data-tables');
 
-    const POWERNODE_STORAGE_CONNECTION =
-      process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
     const TABLE_NAME = 'powernodeconfig';
     const creatorId = 'default-user';
 
@@ -196,7 +194,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Storage connection not configured');
     }
 
-    const tableClient = TableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, TABLE_NAME);
+    const tableClient = ConfigTableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, TABLE_NAME);
 
     let config;
     try {
