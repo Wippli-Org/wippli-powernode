@@ -322,7 +322,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             };
 
             await onedriveTableClient.updateEntity(updatedEntity, 'Merge');
-            onedriveEntity = updatedEntity;
+
+            // Reload entity after update to get the full entity with etag
+            onedriveEntity = await onedriveTableClient.getEntity(effectiveUserId, 'onedrive-config');
 
             addLog('SUCCESS', 'OneDrive Tools', 'Access token refreshed successfully');
           } catch (refreshError: any) {
