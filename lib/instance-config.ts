@@ -298,3 +298,104 @@ export function exportConfigAsURL(config: InstanceConfig, baseUrl?: string): str
 
   return url.toString();
 }
+
+/**
+ * API Integration Functions
+ * Sync instances with Azure Table Storage via REST API
+ */
+
+/**
+ * Load instance from API by ID
+ */
+export async function loadInstanceFromAPI(instanceId: string): Promise<InstanceConfig | null> {
+  try {
+    const response = await fetch(`/api/instances/${instanceId}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to load instance: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to load instance from API:', error);
+    return null;
+  }
+}
+
+/**
+ * Save instance to API
+ */
+export async function saveInstanceToAPI(config: InstanceConfig): Promise<boolean> {
+  try {
+    // Check if instance exists
+    const existing = await loadInstanceFromAPI(config.instanceId);
+
+    const response = existing
+      ? await fetch(`/api/instances/${config.instanceId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        })
+      : await fetch('/api/instances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save instance: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to save instance to API:', error);
+    return false;
+  }
+}
+
+/**
+ * Delete instance from API
+ */
+export async function deleteInstanceFromAPI(instanceId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/instances/${instanceId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete instance: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to delete instance from API:', error);
+    return false;
+  }
+}
+
+/**
+ * List all instances (optionally filtered by supplierId)
+ */
+export async function listInstancesFromAPI(supplierId?: string): Promise<InstanceConfig[]> {
+  try {
+    const url = supplierId
+      ? `/api/instances?supplierId=${encodeURIComponent(supplierId)}`
+      : '/api/instances';
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to list instances: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.instances || [];
+  } catch (error) {
+    console.error('Failed to list instances from API:', error);
+    return [];
+  }
+}

@@ -5,14 +5,17 @@ import {
   updateInstanceConfig,
   exportConfigAsURL,
   isEmbeddedMode,
+  saveInstanceToAPI,
   type InstanceConfig,
 } from '../lib/instance-config';
-import { Copy, Check, Download, Upload, RefreshCw } from 'lucide-react';
+import { Copy, Check, Download, Upload, RefreshCw, Cloud } from 'lucide-react';
 
 export default function InstanceSettings() {
   const [config, setConfig] = useState<InstanceConfig | null>(null);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savedToCloud, setSavedToCloud] = useState(false);
+  const [savingToCloud, setSavingToCloud] = useState(false);
 
   useEffect(() => {
     setConfig(getInstanceConfig());
@@ -23,6 +26,26 @@ export default function InstanceSettings() {
     saveInstanceConfig(config);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleSaveToCloud = async () => {
+    if (!config) return;
+    setSavingToCloud(true);
+
+    try {
+      const success = await saveInstanceToAPI(config);
+      if (success) {
+        setSavedToCloud(true);
+        setTimeout(() => setSavedToCloud(false), 2000);
+      } else {
+        alert('Failed to save instance to cloud. Check console for details.');
+      }
+    } catch (error) {
+      console.error('Error saving to cloud:', error);
+      alert('Failed to save instance to cloud. Check console for details.');
+    } finally {
+      setSavingToCloud(false);
+    }
   };
 
   const handleCopyURL = () => {
@@ -256,7 +279,16 @@ export default function InstanceSettings() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
             >
               {saved ? <Check className="w-4 h-4" /> : null}
-              {saved ? 'Saved!' : 'Save Configuration'}
+              {saved ? 'Saved!' : 'Save Locally'}
+            </button>
+
+            <button
+              onClick={handleSaveToCloud}
+              disabled={savingToCloud}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {savedToCloud ? <Check className="w-4 h-4" /> : <Cloud className="w-4 h-4" />}
+              {savingToCloud ? 'Saving...' : savedToCloud ? 'Saved to Cloud!' : 'Save to Cloud'}
             </button>
 
             <button
