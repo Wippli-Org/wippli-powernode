@@ -272,9 +272,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Add built-in OneDrive storage tools if OneDrive is configured
     try {
       const onedriveTableClient = TableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, ONEDRIVE_TABLE_NAME);
-      const onedriveEntity = await onedriveTableClient.getEntity(effectiveUserId, 'onedrive-config');
+      let onedriveEntity = await onedriveTableClient.getEntity(effectiveUserId, 'onedrive-config');
 
       if (onedriveEntity && onedriveEntity.accessToken) {
+        // Check if token is expired and refresh if needed
+        const expiresAt = onedriveEntity.expiresAt as string;
+        const isExpired = expiresAt ? new Date(expiresAt) <= new Date() : true;
+
+        if (isExpired && onedriveEntity.refreshToken) {
+          addLog('WARN', 'OneDrive Tools', 'Access token expired, attempting to refresh');
+
+          try {
+            const tenantId = onedriveEntity.tenantId as string;
+            const clientId = onedriveEntity.clientId as string;
+            const clientSecret = onedriveEntity.clientSecret as string;
+            const refreshToken = onedriveEntity.refreshToken as string;
+
+            const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+            const tokenResponse = await fetch(tokenUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                refresh_token: refreshToken,
+                grant_type: 'refresh_token',
+                scope: onedriveEntity.scopes as string || 'Files.ReadWrite offline_access User.Read',
+              }),
+            });
+
+            if (!tokenResponse.ok) {
+              const errorText = await tokenResponse.text();
+              throw new Error(`Token refresh failed: ${errorText}`);
+            }
+
+            const tokenData = await tokenResponse.json();
+
+            // Update the stored token
+            const updatedEntity = {
+              partitionKey: onedriveEntity.partitionKey as string,
+              rowKey: onedriveEntity.rowKey as string,
+              accessToken: tokenData.access_token,
+              refreshToken: tokenData.refresh_token || refreshToken,
+              expiresAt: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+              clientId,
+              clientSecret,
+              tenantId,
+              scopes: onedriveEntity.scopes as string,
+            };
+
+            await onedriveTableClient.updateEntity(updatedEntity, 'Merge');
+            onedriveEntity = updatedEntity;
+
+            addLog('SUCCESS', 'OneDrive Tools', 'Access token refreshed successfully');
+          } catch (refreshError: any) {
+            addLog('ERROR', 'OneDrive Tools', `Token refresh failed: ${refreshError.message}`);
+            throw refreshError;
+          }
+        }
+
         addLog('INFO', 'OneDrive Tools', 'Adding built-in OneDrive storage tools');
 
         // Add OneDrive list files tool
