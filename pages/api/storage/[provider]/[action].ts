@@ -158,7 +158,22 @@ async function handleBlobUpload(req: NextApiRequest, res: NextApiResponse) {
 
 async function handleBlobDelete(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { fileName } = req.body;
+    // Manually parse JSON body since bodyParser is disabled
+    let body: any = {};
+    if (req.body && typeof req.body === 'object') {
+      body = req.body;
+    } else {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const bodyText = Buffer.concat(chunks).toString();
+      if (bodyText) {
+        body = JSON.parse(bodyText);
+      }
+    }
+
+    const { fileName } = body;
 
     if (!fileName) {
       res.status(400).json({ error: 'File name is required' });
@@ -355,7 +370,22 @@ async function handleOneDriveDelete(req: NextApiRequest, res: NextApiResponse) {
       return;
     }
 
-    const { fileId } = req.body;
+    // Manually parse JSON body since bodyParser is disabled
+    let body: any = {};
+    if (req.body && typeof req.body === 'object') {
+      body = req.body;
+    } else {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const bodyText = Buffer.concat(chunks).toString();
+      if (bodyText) {
+        body = JSON.parse(bodyText);
+      }
+    }
+
+    const { fileId } = body;
 
     if (!fileId) {
       res.status(400).json({ error: 'File ID is required' });
