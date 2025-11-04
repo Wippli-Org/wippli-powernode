@@ -19,7 +19,7 @@ import {
   GitBranch, Zap, RefreshCw, Clock, Globe, Code, Bug, CheckCircle, Copy,
   FileSearch, Languages, PlayCircle, TestTube, Database, Send, Loader, Clipboard
 } from 'lucide-react';
-import { getInstanceConfig, getWippliStorageKey } from '../lib/instance-config';
+import { getInstanceConfig, getInstanceStorageKey } from '../lib/instance-config';
 
 // Instruction node types with icons and colors
 const INSTRUCTION_TYPES = {
@@ -203,7 +203,7 @@ export default function WorkflowsPage() {
 
   // Load workflows from localStorage (wippli_id isolated)
   useEffect(() => {
-    const storageKey = getWippliStorageKey('powernode-workflows-v2');
+    const storageKey = getInstanceStorageKey('powernode-workflows-v2');
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -222,7 +222,7 @@ export default function WorkflowsPage() {
   // Save workflows to localStorage (wippli_id isolated)
   useEffect(() => {
     if (workflows.length > 0) {
-      const storageKey = getWippliStorageKey('powernode-workflows-v2');
+      const storageKey = getInstanceStorageKey('powernode-workflows-v2');
       localStorage.setItem(storageKey, JSON.stringify(workflows));
     }
   }, [workflows]);
