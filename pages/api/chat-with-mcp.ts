@@ -614,7 +614,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // Build updated messages array (strip logs to reduce storage size)
+      // Build updated messages array
       const updatedMessages = [
         ...(conversationHistory || []).map((m: any, idx: number) => ({
           id: `msg-${Date.now()}-${idx}`,
@@ -633,7 +633,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           role: 'assistant',
           content: reply,
           timestamp: new Date().toISOString(),
-          // Note: logs not included in storage to keep conversation size manageable
+          logs: logs,
         },
       ];
 
