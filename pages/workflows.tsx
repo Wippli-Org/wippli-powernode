@@ -423,9 +423,9 @@ export default function WorkflowsPage() {
     addLogToNode(node.id, 'Sending to AI agent with full context...');
 
     try {
-      // Get wippli_id from instance configuration
+      // Get supplier_id from instance configuration
       const config = getInstanceConfig();
-      const wippli_id = config.wippliId || 'default-wippli';
+      const wippli_id = config.supplierId || 'default-wippli';
 
       // Get or create conversation for workflow debugging
       const conversationId = `workflow-debug-${activeWorkflow?.id || 'unknown'}`;

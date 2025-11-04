@@ -62,12 +62,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Pass user_id and wippli_id for multi-tenant isolation
-    if (instanceConfig.userId) {
-      headers['X-User-Id'] = instanceConfig.userId;
-    }
-    if (instanceConfig.wippliId) {
-      headers['X-Wippli-Id'] = instanceConfig.wippliId;
+    // Pass supplier_id for multi-tenant isolation
+    if (instanceConfig.supplierId) {
+      headers['X-Supplier-Id'] = instanceConfig.supplierId;
     }
 
     const startTime = Date.now();
