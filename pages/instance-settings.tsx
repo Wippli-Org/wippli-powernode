@@ -123,30 +123,16 @@ export default function InstanceSettings() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  User ID
+                  Supplier ID
                 </label>
                 <input
                   type="text"
-                  value={config.userId || ''}
-                  onChange={(e) => setConfig({ ...config, userId: e.target.value })}
+                  value={config.supplierId || ''}
+                  onChange={(e) => setConfig({ ...config, supplierId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="user-123"
+                  placeholder="supplier-123"
                 />
-                <p className="text-xs text-gray-500 mt-1">Global user-level isolation (preferences, configs)</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Wippli ID
-                </label>
-                <input
-                  type="text"
-                  value={config.wippliId || ''}
-                  onChange={(e) => setConfig({ ...config, wippliId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="wippli-456"
-                />
-                <p className="text-xs text-gray-500 mt-1">Task/workflow-level isolation (workflows, executions)</p>
+                <p className="text-xs text-gray-500 mt-1">Organization/supplier-level isolation for multi-tenant environments</p>
               </div>
             </div>
           </div>

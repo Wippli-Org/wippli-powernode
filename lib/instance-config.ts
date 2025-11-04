@@ -223,44 +223,16 @@ export function getInstanceStorageKey(baseKey: string): string {
 }
 
 /**
- * Get user-specific storage key
- * For global user-level data (preferences, personal configs)
+ * Get supplier-specific storage key
+ * For organization/supplier-level data isolation
  */
-export function getUserStorageKey(baseKey: string): string {
+export function getSupplierStorageKey(baseKey: string): string {
   const config = getInstanceConfig();
-  if (!config.userId) {
-    // Fallback to instance-level if no user_id
+  if (!config.supplierId) {
+    // Fallback to instance-level if no supplierId
     return getInstanceStorageKey(baseKey);
   }
-  return `${baseKey}-user-${config.userId}`;
-}
-
-/**
- * Get wippli-specific storage key
- * For task/workflow-level data (workflows, executions, MCP operations)
- */
-export function getWippliStorageKey(baseKey: string): string {
-  const config = getInstanceConfig();
-  if (!config.wippliId) {
-    // Fallback to instance-level if no wippli_id
-    return getInstanceStorageKey(baseKey);
-  }
-  return `${baseKey}-wippli-${config.wippliId}`;
-}
-
-/**
- * Get combined user+wippli storage key
- * For data that needs both user and wippli isolation
- */
-export function getUserWippliStorageKey(baseKey: string): string {
-  const config = getInstanceConfig();
-  if (!config.userId && !config.wippliId) {
-    return getInstanceStorageKey(baseKey);
-  }
-  const parts = [baseKey];
-  if (config.userId) parts.push(`user-${config.userId}`);
-  if (config.wippliId) parts.push(`wippli-${config.wippliId}`);
-  return parts.join('-');
+  return `${baseKey}-supplier-${config.supplierId}`;
 }
 
 /**
