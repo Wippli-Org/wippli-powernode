@@ -1,0 +1,79 @@
+{
+  "tools": [
+    {
+      "name": "list_files",
+      "description": "List all files in OneDrive root folder. Returns file names, IDs, sizes, and modification dates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Read the contents of a file from OneDrive by file ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The OneDrive file ID"
+          }
+        },
+        "required": ["fileId"]
+      }
+    },
+    {
+      "name": "upload_file",
+      "description": "Upload a file to OneDrive root folder.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "The name for the file"
+          },
+          "content": {
+            "type": "string",
+            "description": "The file content"
+          }
+        },
+        "required": ["fileName", "content"]
+      }
+    },
+    {
+      "name": "delete_file",
+      "description": "Delete a file from OneDrive by file ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The OneDrive file ID"
+          }
+        },
+        "required": ["fileId"]
+      }
+    },
+    {
+      "name": "download_url",
+      "description": "Get a temporary download URL for a file (expires in 1 hour).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The OneDrive file ID"
+          }
+        },
+        "required": ["fileId"]
+      }
+    }
+  ],
+  "serverInfo": {
+    "name": "OneDrive MCP Server",
+    "version": "1.0.0",
+    "protocolVersion": "2023-11-05",
+    "url": "https://powernode-monitoring.agreeablemushroom-48fcffb3.australiaeast.azurecontainerapps.io/api/mcp-server/onedrive"
+  }
+}
