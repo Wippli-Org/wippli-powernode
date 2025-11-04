@@ -5,8 +5,12 @@
  * enabling embedding in n8n or other platforms with instance-specific settings.
  *
  * Multi-tenant isolation:
- * - user_id: Global user-level isolation (preferences, personal configs)
- * - wippli_id: Task/workflow-level isolation (workflows, executions, MCP operations)
+ * - supplierId: Supplier/organization-level isolation (top-level business entity)
+ * - instanceId: Per-deployment/workflow isolation
+ *
+ * Auto-detection:
+ * - Workflow ID/Name automatically detected from n8n API when available
+ * - Execution context preserved for workflow runs
  */
 
 export interface InstanceConfig {
@@ -14,14 +18,32 @@ export interface InstanceConfig {
   instanceName: string;
 
   // Multi-tenant Identifiers
-  userId?: string;      // Global user-level isolation
-  wippliId?: string;    // Task/workflow-level isolation
+  supplierId?: string;  // Supplier/organization-level isolation (replaces userId)
 
   // n8n Configuration
   n8n?: {
     apiUrl: string;
     apiKey: string;
     enabled: boolean;
+    workflowId?: string;      // Auto-detected from API or user-selected
+    workflowName?: string;    // Display name for the workflow
+    executionId?: string;     // Current execution context
+  };
+
+  // Subscription & Auth
+  subscription?: {
+    stripeCustomerId?: string;
+    subscriptionId?: string;
+    status?: 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
+    currentPeriodEnd?: Date;
+    plan?: 'free' | 'starter' | 'pro' | 'enterprise';
+  };
+
+  auth?: {
+    isAuthenticated?: boolean;
+    email?: string;
+    name?: string;
+    authProvider?: 'email' | 'google' | 'microsoft';
   };
 
   // Storage Configuration
@@ -74,15 +96,19 @@ export function getInstanceConfig(): InstanceConfig {
     instanceName: urlConfig.instanceName || storedConfig?.instanceName || 'Default Instance',
 
     // Multi-tenant identifiers
-    userId: urlConfig.userId || storedConfig?.userId,
-    wippliId: urlConfig.wippliId || storedConfig?.wippliId,
+    supplierId: urlConfig.supplierId || storedConfig?.supplierId,
 
     n8n: {
       apiUrl: urlConfig.n8nApiUrl || storedConfig?.n8n?.apiUrl || '',
       apiKey: urlConfig.n8nApiKey || storedConfig?.n8n?.apiKey || '',
       enabled: !!(urlConfig.n8nApiUrl || storedConfig?.n8n?.enabled),
+      workflowId: urlConfig.n8nWorkflowId || storedConfig?.n8n?.workflowId,
+      workflowName: storedConfig?.n8n?.workflowName,
+      executionId: urlConfig.n8nExecutionId || storedConfig?.n8n?.executionId,
     },
 
+    subscription: storedConfig?.subscription,
+    auth: storedConfig?.auth,
     storage: storedConfig?.storage || {},
     ai: storedConfig?.ai || {},
     adobe: storedConfig?.adobe || {},
@@ -133,6 +159,8 @@ export function updateInstanceConfig(updates: Partial<InstanceConfig>): Instance
 function getConfigFromURL(): Partial<InstanceConfig> & {
   n8nApiUrl?: string;
   n8nApiKey?: string;
+  n8nWorkflowId?: string;
+  n8nExecutionId?: string;
   hideNavigation?: boolean;
   enabledPages?: string[];
 } {
@@ -147,10 +175,11 @@ function getConfigFromURL(): Partial<InstanceConfig> & {
   return {
     instanceId: getParam('instanceId') || undefined,
     instanceName: getParam('instanceName') || undefined,
-    userId: getParam('userId') || getParam('user_id') || undefined,
-    wippliId: getParam('wippliId') || getParam('wippli_id') || undefined,
+    supplierId: getParam('supplierId') || getParam('supplier_id') || undefined,
     n8nApiUrl: getParam('n8nApiUrl') || getParam('n8n_api_url') || undefined,
     n8nApiKey: getParam('n8nApiKey') || getParam('n8n_api_key') || undefined,
+    n8nWorkflowId: getParam('n8nWorkflowId') || getParam('workflow_id') || undefined,
+    n8nExecutionId: getParam('n8nExecutionId') || getParam('execution_id') || undefined,
     hideNavigation: getParam('hideNav') === 'true',
     enabledPages: getParam('pages')?.split(','),
   };
@@ -270,17 +299,21 @@ export function exportConfigAsURL(config: InstanceConfig, baseUrl?: string): str
   url.searchParams.set('instanceId', config.instanceId);
   url.searchParams.set('instanceName', config.instanceName);
 
-  if (config.userId) {
-    url.searchParams.set('userId', config.userId);
-  }
-
-  if (config.wippliId) {
-    url.searchParams.set('wippliId', config.wippliId);
+  if (config.supplierId) {
+    url.searchParams.set('supplierId', config.supplierId);
   }
 
   if (config.n8n?.enabled && config.n8n.apiUrl && config.n8n.apiKey) {
     url.searchParams.set('n8nApiUrl', config.n8n.apiUrl);
     url.searchParams.set('n8nApiKey', config.n8n.apiKey);
+
+    if (config.n8n.workflowId) {
+      url.searchParams.set('n8nWorkflowId', config.n8n.workflowId);
+    }
+
+    if (config.n8n.executionId) {
+      url.searchParams.set('n8nExecutionId', config.n8n.executionId);
+    }
   }
 
   if (config.ui?.hideNavigation) {

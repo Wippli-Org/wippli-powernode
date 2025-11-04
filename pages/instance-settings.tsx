@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Navigation from '../components/Navigation';
 import {
   getInstanceConfig,
   saveInstanceConfig,
@@ -76,8 +75,6 @@ export default function InstanceSettings() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {!config.ui?.hideNavigation && <Navigation />}
-
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h1 className="text-2xl font-bold mb-2">Instance Settings</h1>
