@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check, Send, MessageSquare, Cloud } from 'lucide-react';
 import OneDriveConfigModal from '../components/OneDriveConfigModal';
+import { getInstanceConfig } from '../lib/instance-config';
 
 interface AIProvider {
   enabled: boolean;
@@ -57,7 +58,14 @@ const providerInfo = {
 
 export default function ConfigPage() {
   const router = useRouter();
-  const [supplierId, setSupplierId] = useState<string>('default-user');
+  const [supplierId, setSupplierId] = useState<string>(() => {
+    // Initialize from instance config on mount
+    if (typeof window !== 'undefined') {
+      const instanceConfig = getInstanceConfig();
+      return instanceConfig.supplierId || 'default-user';
+    }
+    return 'default-user';
+  });
 
   const [config, setConfig] = useState<PowerNodeConfig>({
     providers: {
@@ -91,15 +99,13 @@ export default function ConfigPage() {
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
 
-  // Load supplierId from URL query parameter
+  // Load supplierId from instance config (auto-detects from URL or localStorage)
   useEffect(() => {
-    if (router.isReady) {
-      const supplierIdParam = router.query.supplierId as string;
-      if (supplierIdParam) {
-        setSupplierId(supplierIdParam);
-      }
+    const instanceConfig = getInstanceConfig();
+    if (instanceConfig.supplierId) {
+      setSupplierId(instanceConfig.supplierId);
     }
-  }, [router.isReady, router.query.supplierId]);
+  }, []);
 
   useEffect(() => {
     if (supplierId) {
