@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const {
     message,
-    conversationHistory,
+    conversationHistory: rawConversationHistory,
     fileUrl,
     fileName,
     fileId,
@@ -36,6 +36,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!message) {
     return res.status(400).json({ error: 'Message required' });
+  }
+
+  // Handle conversation history - n8n may send it as a string like "[Array: []]"
+  let conversationHistory: any[] = [];
+  if (rawConversationHistory) {
+    if (Array.isArray(rawConversationHistory)) {
+      conversationHistory = rawConversationHistory;
+    } else if (typeof rawConversationHistory === 'string') {
+      try {
+        conversationHistory = JSON.parse(rawConversationHistory);
+      } catch {
+        // If parsing fails, check if it's the "[Array: []]" string and treat as empty
+        if (rawConversationHistory.startsWith('[Array:') || rawConversationHistory === '[]') {
+          conversationHistory = [];
+        }
+      }
+    }
   }
 
   const effectiveUserId = userId || 'default-user';
@@ -57,7 +74,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
-    addLog('INFO', 'PowerNode Chat', `Received message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+    addLog('INFO', 'PowerNode Chat', `Received message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}}"`);
+    addLog('INFO', 'Conversation History', `History length: ${conversationHistory.length} messages`, {
+      rawType: typeof rawConversationHistory,
+      rawValue: rawConversationHistory,
+      parsed: conversationHistory.length > 0 ? `${conversationHistory.length} messages` : 'empty'
+    });
 
     // OneDrive File Access - Download file if provided
     let fileContent: Buffer | null = null;
