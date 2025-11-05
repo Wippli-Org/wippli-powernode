@@ -706,7 +706,7 @@ const TOOLS = [
   },
   {
     name: 'update_field',
-    description: 'Find and replace specific text content in a Word document in OneDrive or Azure Blob Storage',
+    description: 'Find and replace specific text content in a Word document while preserving all formatting (bold, italic, colors, tables, images, etc.) in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1819,37 +1819,54 @@ async function updateField(args: any): Promise<string> {
   const { filename, searchText, replaceText } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
+  // Helper function to escape regex special characters
+  function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  // Helper function to replace text in XML while preserving formatting
+  function replaceTextInXml(xml: string, search: string, replace: string): string {
+    // Escape search text for regex
+    const escapedSearch = escapeRegex(search);
+
+    // Replace text content between XML tags while preserving the tags
+    // This regex matches text content between > and < that contains our search string
+    const regex = new RegExp(`>([^<]*)(${escapedSearch})([^<]*)<`, 'g');
+    return xml.replace(regex, (match, before, searchMatch, after) => {
+      return `>${before}${replace}${after}<`;
+    });
+  }
+
   // Try OneDrive first
   try {
     const buffer = await downloadFromOneDrive(docFilename);
 
-    // Parse the document with mammoth to get raw text
-    const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ buffer });
-    const docText = result.value;
+    // Use pizzip to load .docx as a ZIP archive
+    const PizZip = (await import('pizzip')).default;
+    const zip = new PizZip(buffer);
+
+    // Get document.xml
+    const documentXml = zip.file('word/document.xml')?.asText();
+    if (!documentXml) {
+      throw new Error('Could not extract document.xml from .docx file');
+    }
 
     // Check if search text exists
-    if (!docText.includes(searchText)) {
+    if (!documentXml.includes(searchText)) {
       throw new Error(`Text "${searchText}" not found in document`);
     }
 
-    // Replace text
-    const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
+    // Replace text in XML while preserving all formatting
+    const updatedXml = replaceTextInXml(documentXml, searchText, replaceText);
 
-    // Create new document with updated text
-    const doc = new Document({
-      sections: [{
-        children: updatedText.split('\n').map(line =>
-          new Paragraph({ children: [new TextRun(line || ' ')] })
-        )
-      }]
-    });
+    // Update the ZIP with modified XML
+    zip.file('word/document.xml', updatedXml);
 
-    // Convert and upload
-    const { Packer } = await import('docx');
-    const newBuffer = await Packer.toBuffer(doc);
+    // Generate new buffer
+    const newBuffer = Buffer.from(zip.generate({ type: 'nodebuffer' }));
 
     await updateOneDrive(docFilename, newBuffer);
+    console.log(`Updated "${searchText}" to "${replaceText}" in ${docFilename} in OneDrive (formatting preserved)`);
     return `Updated "${searchText}" to "${replaceText}" in ${docFilename} in OneDrive`;
   } catch (oneDriveError: any) {
     console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
@@ -1868,31 +1885,29 @@ async function updateField(args: any): Promise<string> {
 
     const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
-    // Parse the document with mammoth to get raw text
-    const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ buffer });
-    const docText = result.value;
+    // Use pizzip to load .docx as a ZIP archive
+    const PizZip = (await import('pizzip')).default;
+    const zip = new PizZip(buffer);
+
+    // Get document.xml
+    const documentXml = zip.file('word/document.xml')?.asText();
+    if (!documentXml) {
+      throw new Error('Could not extract document.xml from .docx file');
+    }
 
     // Check if search text exists
-    if (!docText.includes(searchText)) {
+    if (!documentXml.includes(searchText)) {
       throw new Error(`Text "${searchText}" not found in document`);
     }
 
-    // Replace text
-    const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
+    // Replace text in XML while preserving all formatting
+    const updatedXml = replaceTextInXml(documentXml, searchText, replaceText);
 
-    // Create new document with updated text
-    const doc = new Document({
-      sections: [{
-        children: updatedText.split('\n').map(line =>
-          new Paragraph({ children: [new TextRun(line || ' ')] })
-        )
-      }]
-    });
+    // Update the ZIP with modified XML
+    zip.file('word/document.xml', updatedXml);
 
-    // Convert and upload
-    const { Packer } = await import('docx');
-    const newBuffer = await Packer.toBuffer(doc);
+    // Generate new buffer
+    const newBuffer = Buffer.from(zip.generate({ type: 'nodebuffer' }));
 
     await blockBlobClient.uploadData(newBuffer, {
       blobHTTPHeaders: {
@@ -1900,6 +1915,7 @@ async function updateField(args: any): Promise<string> {
       }
     });
 
+    console.log(`Updated "${searchText}" to "${replaceText}" in ${docFilename} in Blob Storage (formatting preserved)`);
     return `Updated "${searchText}" to "${replaceText}" in ${docFilename} in Blob Storage`;
   }
 }
