@@ -282,6 +282,166 @@ async function listOneDriveDocuments(userId: string = 'default-user'): Promise<a
   }
 }
 
+async function uploadToOneDrive(filename: string, buffer: Buffer, userId: string = 'default-user'): Promise<any> {
+  const accessToken = await getOneDriveAccessToken(userId);
+
+  // Upload or replace file in OneDrive root
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURIComponent(filename)}:/content`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      },
+      body: buffer,
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to upload to OneDrive: ${response.statusText}. ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+async function updateOneDrive(fileIdOrFilename: string, buffer: Buffer, userId: string = 'default-user'): Promise<any> {
+  const accessToken = await getOneDriveAccessToken(userId);
+
+  // Try to get file ID first if filename was provided
+  let fileId = fileIdOrFilename;
+
+  // Check if it's a filename (contains .docx) vs an ID
+  if (fileIdOrFilename.includes('.docx')) {
+    try {
+      const searchResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${encodeURIComponent(fileIdOrFilename)}'`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        if (searchData.value && searchData.value.length > 0) {
+          fileId = searchData.value[0].id;
+        }
+      }
+    } catch (error: any) {
+      console.log(`Could not find file by name, trying to upload: ${error.message}`);
+      // If file not found, upload as new file
+      return await uploadToOneDrive(fileIdOrFilename, buffer, userId);
+    }
+  }
+
+  // Update existing file by ID
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      },
+      body: buffer,
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update OneDrive file: ${response.statusText}. ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+async function deleteFromOneDrive(fileIdOrFilename: string, userId: string = 'default-user'): Promise<boolean> {
+  const accessToken = await getOneDriveAccessToken(userId);
+
+  let fileId = fileIdOrFilename;
+
+  // Try to get file ID if filename was provided
+  if (fileIdOrFilename.includes('.docx')) {
+    try {
+      const searchResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${encodeURIComponent(fileIdOrFilename)}'`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        if (searchData.value && searchData.value.length > 0) {
+          fileId = searchData.value[0].id;
+        } else {
+          throw new Error(`File not found in OneDrive: ${fileIdOrFilename}`);
+        }
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to find file for deletion: ${error.message}`);
+    }
+  }
+
+  // Delete file by ID
+  const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok && response.status !== 204) {
+    throw new Error(`Failed to delete OneDrive file: ${response.statusText}`);
+  }
+
+  return true;
+}
+
+async function copyInOneDrive(sourceFileIdOrFilename: string, targetFilename: string, userId: string = 'default-user'): Promise<any> {
+  const accessToken = await getOneDriveAccessToken(userId);
+
+  let sourceFileId = sourceFileIdOrFilename;
+
+  // Try to get source file ID if filename was provided
+  if (sourceFileIdOrFilename.includes('.docx')) {
+    const searchResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${encodeURIComponent(sourceFileIdOrFilename)}'`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+
+    if (searchResponse.ok) {
+      const searchData = await searchResponse.json();
+      if (searchData.value && searchData.value.length > 0) {
+        sourceFileId = searchData.value[0].id;
+      } else {
+        throw new Error(`Source file not found in OneDrive: ${sourceFileIdOrFilename}`);
+      }
+    } else {
+      throw new Error(`Failed to search for source file in OneDrive`);
+    }
+  }
+
+  // Copy file using Microsoft Graph API
+  const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${sourceFileId}/copy`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: targetFilename,
+      parentReference: {
+        path: '/drive/root:'
+      }
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to copy OneDrive file: ${response.statusText}. ${errorText}`);
+  }
+
+  // Copy operation is async, returns 202 Accepted with a Location header to monitor progress
+  // For now, we'll return success immediately
+  return { message: `File copy initiated from ${sourceFileIdOrFilename} to ${targetFilename}` };
+}
+
 // Tool definitions (MCP protocol)
 const TOOLS = [
   // DOCUMENT MANAGEMENT
@@ -336,7 +496,7 @@ const TOOLS = [
   },
   {
     name: 'delete_document',
-    description: 'Delete a Word document from Azure Blob Storage',
+    description: 'Delete a Word document from OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -364,7 +524,7 @@ const TOOLS = [
   },
   {
     name: 'copy_document',
-    description: 'Copy/duplicate a Word document',
+    description: 'Copy/duplicate a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -384,7 +544,7 @@ const TOOLS = [
   // TEMPLATE MANAGEMENT
   {
     name: 'upload_template',
-    description: 'Upload a Word template to blob storage in the templates/ folder',
+    description: 'Upload a Word template to OneDrive or Azure Blob Storage in the templates/ folder',
     inputSchema: {
       type: 'object',
       properties: {
@@ -402,7 +562,7 @@ const TOOLS = [
   },
   {
     name: 'list_templates',
-    description: 'List all available Word templates',
+    description: 'List all available Word templates from OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {}
@@ -410,7 +570,7 @@ const TOOLS = [
   },
   {
     name: 'create_from_template',
-    description: 'Create a new document from a template with variable substitution (replaces {{variableName}} placeholders)',
+    description: 'Create a new document from a template in OneDrive or Azure Blob Storage with variable substitution (replaces {{variableName}} placeholders)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -432,7 +592,7 @@ const TOOLS = [
   },
   {
     name: 'delete_template',
-    description: 'Delete a Word template from storage',
+    description: 'Delete a Word template from OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -448,7 +608,7 @@ const TOOLS = [
   // CONTENT EDITING
   {
     name: 'add_paragraph',
-    description: 'Add a paragraph to an existing Word document',
+    description: 'Add a paragraph to an existing Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -471,7 +631,7 @@ const TOOLS = [
   },
   {
     name: 'add_heading',
-    description: 'Add a heading to an existing Word document',
+    description: 'Add a heading to an existing Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -495,7 +655,7 @@ const TOOLS = [
   },
   {
     name: 'add_list',
-    description: 'Add a bulleted or numbered list to a Word document',
+    description: 'Add a bulleted or numbered list to a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -519,7 +679,7 @@ const TOOLS = [
   },
   {
     name: 'add_table',
-    description: 'Create and add a table to a Word document',
+    description: 'Create and add a table to a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -546,7 +706,7 @@ const TOOLS = [
   },
   {
     name: 'update_field',
-    description: 'Find and replace specific text content in a Word document',
+    description: 'Find and replace specific text content in a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -568,7 +728,7 @@ const TOOLS = [
   },
   {
     name: 'insert_page_break',
-    description: 'Insert a page break in a Word document',
+    description: 'Insert a page break in a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -584,7 +744,7 @@ const TOOLS = [
   // FORMATTING
   {
     name: 'format_text',
-    description: 'Add formatted text (bold, italic, underline, color) to a Word document',
+    description: 'Add formatted text (bold, italic, underline, color) to a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -618,7 +778,7 @@ const TOOLS = [
   },
   {
     name: 'set_paragraph_alignment',
-    description: 'Set alignment for the last paragraph in a document',
+    description: 'Set alignment for the last paragraph in a document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -639,7 +799,7 @@ const TOOLS = [
   // ADVANCED FEATURES
   {
     name: 'add_image',
-    description: 'Insert an image into a Word document from a URL or blob storage',
+    description: 'Insert an image into a Word document in OneDrive or Azure Blob Storage from a URL or blob storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -665,7 +825,7 @@ const TOOLS = [
   },
   {
     name: 'add_hyperlink',
-    description: 'Add a clickable hyperlink to a Word document',
+    description: 'Add a clickable hyperlink to a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -687,7 +847,7 @@ const TOOLS = [
   },
   {
     name: 'add_table_of_contents',
-    description: 'Insert a table of contents in a Word document',
+    description: 'Insert a table of contents in a Word document in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -701,7 +861,7 @@ const TOOLS = [
   },
   {
     name: 'merge_documents',
-    description: 'Merge multiple Word documents into one',
+    description: 'Merge multiple Word documents into one in OneDrive or Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -792,19 +952,29 @@ async function createDocument(args: any): Promise<string> {
   const { Packer } = await import('docx');
   const buffer = await Packer.toBuffer(doc);
 
-  // Upload to blob storage
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first for live collaboration
+  try {
+    await uploadToOneDrive(docFilename, buffer);
+    console.log(`Document created in OneDrive: ${docFilename}`);
+    return `Document created in OneDrive: ${docFilename}`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive upload failed (${oneDriveError.message}), falling back to Blob Storage...`);
 
-  await blockBlobClient.uploadData(buffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }
-  });
+    // Fallback to blob storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  return `Document created: ${docFilename}`;
+    await blockBlobClient.uploadData(buffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    console.log(`Document created in Blob Storage: ${docFilename}`);
+    return `Document created in Blob Storage: ${docFilename}`;
+  }
 }
 
 async function readDocument(args: any): Promise<string> {
@@ -898,21 +1068,30 @@ async function deleteDocument(args: any): Promise<string> {
   const { filename } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    await deleteFromOneDrive(docFilename);
+    return `Document deleted from OneDrive: ${docFilename}`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive delete failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Check if exists
-  const exists = await blockBlobClient.exists();
-  if (!exists) {
-    throw new Error(`Document ${docFilename} not found`);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+    // Check if exists
+    const exists = await blockBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Document ${docFilename} not found in OneDrive or Blob Storage`);
+    }
+
+    // Delete
+    await blockBlobClient.delete();
+
+    return `Document deleted from Blob Storage: ${docFilename}`;
   }
-
-  // Delete
-  await blockBlobClient.delete();
-
-  return `Document ${docFilename} deleted successfully`;
 }
 
 async function getDocumentUrl(args: any): Promise<string> {
@@ -967,23 +1146,32 @@ async function copyDocument(args: any): Promise<string> {
   const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
   const targetDocFilename = targetFilename.endsWith('.docx') ? targetFilename : `${targetFilename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
+  // Try OneDrive first
+  try {
+    await copyInOneDrive(sourceDocFilename, targetDocFilename);
+    return `Document copied in OneDrive: ${sourceDocFilename} to ${targetDocFilename}`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive copy failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
-  const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
 
-  // Check if source exists
-  const exists = await sourceBlobClient.exists();
-  if (!exists) {
-    throw new Error(`Source document ${sourceDocFilename} not found`);
+    const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+    const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+
+    // Check if source exists
+    const exists = await sourceBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Source document ${sourceDocFilename} not found in OneDrive or Blob Storage`);
+    }
+
+    // Copy blob
+    await targetBlobClient.beginCopyFromURL(sourceBlobClient.url);
+
+    return `Document copied in Blob Storage: ${sourceDocFilename} to ${targetDocFilename}`;
   }
-
-  // Copy blob
-  await targetBlobClient.beginCopyFromURL(sourceBlobClient.url);
-
-  return `Document copied from ${sourceDocFilename} to ${targetDocFilename}`;
 }
 
 // TEMPLATE FUNCTIONS
@@ -993,40 +1181,81 @@ async function uploadTemplate(args: any): Promise<string> {
   const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
   const templateDocFilename = templateName.endsWith('.docx') ? templateName : `${templateName}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
+  // Try OneDrive first
+  try {
+    // Download source from OneDrive
+    const buffer = await downloadFromOneDrive(sourceDocFilename);
+    // Upload as template (templates/ prefix)
+    await uploadToOneDrive(`templates/${templateDocFilename}`, buffer);
+    return `Template uploaded to OneDrive: templates/${templateDocFilename}`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive template upload failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
-  const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
 
-  // Check if source exists
-  const exists = await sourceBlobClient.exists();
-  if (!exists) {
-    throw new Error(`Source document ${sourceDocFilename} not found`);
+    const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+    const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+
+    // Check if source exists
+    const exists = await sourceBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Source document ${sourceDocFilename} not found in OneDrive or Blob Storage`);
+    }
+
+    // Copy to templates folder
+    await templateBlobClient.beginCopyFromURL(sourceBlobClient.url);
+
+    return `Template uploaded to Blob Storage: templates/${templateDocFilename}`;
   }
-
-  // Copy to templates folder
-  await templateBlobClient.beginCopyFromURL(sourceBlobClient.url);
-
-  return `Template ${templateDocFilename} uploaded to templates/ folder`;
 }
 
 async function listTemplates(args: any): Promise<string> {
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-
   const templates: any[] = [];
 
-  for await (const blob of containerClient.listBlobsFlat({ prefix: 'templates/' })) {
-    if (blob.name.endsWith('.docx')) {
-      templates.push({
-        name: blob.name.replace('templates/', ''),
-        size: blob.properties.contentLength,
-        lastModified: blob.properties.lastModified
-      });
+  // Try OneDrive first
+  try {
+    const accessToken = await getOneDriveAccessToken();
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const oneDriveTemplates = data.value
+        .filter((item: any) => item.name && item.name.startsWith('templates/') && item.name.endsWith('.docx'))
+        .map((item: any) => ({
+          name: item.name.replace('templates/', ''),
+          size: item.size,
+          lastModified: item.lastModifiedDateTime,
+          source: 'OneDrive'
+        }));
+      templates.push(...oneDriveTemplates);
     }
+  } catch (error: any) {
+    console.log(`Failed to list OneDrive templates: ${error.message}`);
+  }
+
+  // Also get Blob Storage templates
+  try {
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+
+    for await (const blob of containerClient.listBlobsFlat({ prefix: 'templates/' })) {
+      if (blob.name.endsWith('.docx')) {
+        templates.push({
+          name: blob.name.replace('templates/', ''),
+          size: blob.properties.contentLength,
+          lastModified: blob.properties.lastModified,
+          source: 'Blob Storage'
+        });
+      }
+    }
+  } catch (error: any) {
+    console.log(`Failed to list Blob Storage templates: ${error.message}`);
   }
 
   return JSON.stringify(templates, null, 2);
@@ -1037,23 +1266,35 @@ async function createFromTemplate(args: any): Promise<string> {
   const templateDocFilename = templateName.endsWith('.docx') ? templateName : `${templateName}.docx`;
   const targetDocFilename = targetFilename.endsWith('.docx') ? targetFilename : `${targetFilename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
+  let buffer: Buffer;
+  let source: string;
 
-  // Download template
-  const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
-  const exists = await templateBlobClient.exists();
-  if (!exists) {
-    throw new Error(`Template ${templateDocFilename} not found in templates/ folder`);
+  // Try OneDrive first
+  try {
+    buffer = await downloadFromOneDrive(`templates/${templateDocFilename}`);
+    source = 'OneDrive';
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive template download failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+
+    const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+    const exists = await templateBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Template ${templateDocFilename} not found in OneDrive or Blob Storage templates/ folder`);
+    }
+
+    const downloadResponse = await templateBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download template from Blob Storage');
+    }
+
+    buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    source = 'Blob Storage';
   }
-
-  const downloadResponse = await templateBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download template');
-  }
-
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   // Parse template with mammoth
   const mammoth = await import('mammoth');
@@ -1081,458 +1322,887 @@ async function createFromTemplate(args: any): Promise<string> {
   const { Packer } = await import('docx');
   const newBuffer = await Packer.toBuffer(doc);
 
-  const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
-  await targetBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }
-  });
+  // Try to upload to OneDrive first
+  try {
+    await uploadToOneDrive(targetDocFilename, newBuffer);
+    return `Document created from template (${source}) and uploaded to OneDrive: ${targetDocFilename}${variables ? ' with variable substitution' : ''}`;
+  } catch (uploadError: any) {
+    console.log(`OneDrive upload failed, trying Blob Storage...`);
 
-  return `Document ${targetDocFilename} created from template ${templateDocFilename}${variables ? ' with variable substitution' : ''}`;
+    // Fallback to Blob Storage upload
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+
+    await targetBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Document created from template (${source}) and uploaded to Blob Storage: ${targetDocFilename}${variables ? ' with variable substitution' : ''}`;
+  }
 }
 
 async function deleteTemplate(args: any): Promise<string> {
   const { templateName } = args;
   const templateDocFilename = templateName.endsWith('.docx') ? templateName : `${templateName}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+  // Try OneDrive first
+  try {
+    await deleteFromOneDrive(`templates/${templateDocFilename}`);
+    return `Template deleted from OneDrive: templates/${templateDocFilename}`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive template delete failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Check if exists
-  const exists = await templateBlobClient.exists();
-  if (!exists) {
-    throw new Error(`Template ${templateDocFilename} not found in templates/ folder`);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const templateBlobClient = containerClient.getBlockBlobClient(`templates/${templateDocFilename}`);
+
+    // Check if exists
+    const exists = await templateBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Template ${templateDocFilename} not found in OneDrive or Blob Storage templates/ folder`);
+    }
+
+    // Delete
+    await templateBlobClient.delete();
+
+    return `Template deleted from Blob Storage: templates/${templateDocFilename}`;
   }
-
-  // Delete
-  await templateBlobClient.delete();
-
-  return `Template ${templateDocFilename} deleted from templates/ folder`;
 }
 
 async function addParagraph(args: any): Promise<string> {
   const { filename, text, alignment } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document with existing text + new paragraph
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    // Add new paragraph with alignment
+    const alignmentMap: any = {
+      left: AlignmentType.LEFT,
+      center: AlignmentType.CENTER,
+      right: AlignmentType.RIGHT,
+      justify: AlignmentType.JUSTIFIED
+    };
 
-  // Create new document with existing text + new paragraph
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
+    paragraphs.push(
+      new Paragraph({
+        children: [new TextRun(text)],
+        alignment: alignment ? alignmentMap[alignment] : AlignmentType.LEFT
+      })
+    );
 
-  // Add new paragraph with alignment
-  const alignmentMap: any = {
-    left: AlignmentType.LEFT,
-    center: AlignmentType.CENTER,
-    right: AlignmentType.RIGHT,
-    justify: AlignmentType.JUSTIFIED
-  };
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
 
-  paragraphs.push(
-    new Paragraph({
-      children: [new TextRun(text)],
-      alignment: alignment ? alignmentMap[alignment] : AlignmentType.LEFT
-    })
-  );
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added paragraph to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added paragraph to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document with existing text + new paragraph
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Add new paragraph with alignment
+    const alignmentMap: any = {
+      left: AlignmentType.LEFT,
+      center: AlignmentType.CENTER,
+      right: AlignmentType.RIGHT,
+      justify: AlignmentType.JUSTIFIED
+    };
+
+    paragraphs.push(
+      new Paragraph({
+        children: [new TextRun(text)],
+        alignment: alignment ? alignmentMap[alignment] : AlignmentType.LEFT
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added paragraph to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function addHeading(args: any): Promise<string> {
   const { filename, text, level } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document with existing text + new heading
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    // Add new heading
+    const headingLevels: any = {
+      1: HeadingLevel.HEADING_1,
+      2: HeadingLevel.HEADING_2,
+      3: HeadingLevel.HEADING_3,
+      4: HeadingLevel.HEADING_4,
+      5: HeadingLevel.HEADING_5,
+      6: HeadingLevel.HEADING_6
+    };
 
-  // Create new document with existing text + new heading
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
+    paragraphs.push(
+      new Paragraph({
+        text,
+        heading: headingLevels[level] || HeadingLevel.HEADING_1
+      })
+    );
 
-  // Add new heading
-  const headingLevels: any = {
-    1: HeadingLevel.HEADING_1,
-    2: HeadingLevel.HEADING_2,
-    3: HeadingLevel.HEADING_3,
-    4: HeadingLevel.HEADING_4,
-    5: HeadingLevel.HEADING_5,
-    6: HeadingLevel.HEADING_6
-  };
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
 
-  paragraphs.push(
-    new Paragraph({
-      text,
-      heading: headingLevels[level] || HeadingLevel.HEADING_1
-    })
-  );
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added heading level ${level} to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added heading level ${level} to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document with existing text + new heading
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Add new heading
+    const headingLevels: any = {
+      1: HeadingLevel.HEADING_1,
+      2: HeadingLevel.HEADING_2,
+      3: HeadingLevel.HEADING_3,
+      4: HeadingLevel.HEADING_4,
+      5: HeadingLevel.HEADING_5,
+      6: HeadingLevel.HEADING_6
+    };
+
+    paragraphs.push(
+      new Paragraph({
+        text,
+        heading: headingLevels[level] || HeadingLevel.HEADING_1
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added heading level ${level} to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function addList(args: any): Promise<string> {
   const { filename, items, type } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
-
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
-
-  // Create new document with existing text + list
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
-
-  // Add list items
-  const bulletChar = type === 'bullet' ? '• ' : '';
-  items.forEach((item: string, index: number) => {
-    const prefix = type === 'number' ? `${index + 1}. ` : bulletChar;
-    paragraphs.push(
-      new Paragraph({
-        children: [new TextRun(`${prefix}${item}`)]
-      })
+    // Create new document with existing text + list
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
     );
-  });
 
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
+    // Add list items
+    const bulletChar = type === 'bullet' ? '• ' : '';
+    items.forEach((item: string, index: number) => {
+      const prefix = type === 'number' ? `${index + 1}. ` : bulletChar;
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun(`${prefix}${item}`)]
+        })
+      );
+    });
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added ${type} list with ${items.length} items to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added ${type} list with ${items.length} items to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document with existing text + list
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Add list items
+    const bulletChar = type === 'bullet' ? '• ' : '';
+    items.forEach((item: string, index: number) => {
+      const prefix = type === 'number' ? `${index + 1}. ` : bulletChar;
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun(`${prefix}${item}`)]
+        })
+      );
+    });
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added ${type} list with ${items.length} items to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function addTable(args: any): Promise<string> {
   const { filename, headers, rows } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create paragraphs from existing text
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
-
-  // Create paragraphs from existing text
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
-
-  // Create table
-  const tableRows = [
-    // Header row
-    new TableRow({
-      children: headers.map((header: string) =>
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: header, bold: true })] })],
-          width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
-        })
-      )
-    }),
-    // Data rows
-    ...rows.map((row: string[]) =>
+    // Create table
+    const tableRows = [
+      // Header row
       new TableRow({
-        children: row.map((cell: string) =>
+        children: headers.map((header: string) =>
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun(cell)] })],
+            children: [new Paragraph({ children: [new TextRun({ text: header, bold: true })] })],
             width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
           })
         )
-      })
-    )
-  ];
+      }),
+      // Data rows
+      ...rows.map((row: string[]) =>
+        new TableRow({
+          children: row.map((cell: string) =>
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun(cell)] })],
+              width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
+            })
+          )
+        })
+      )
+    ];
 
-  const table = new Table({
-    rows: tableRows,
-    width: { size: 100, type: WidthType.PERCENTAGE }
-  });
+    const table = new Table({
+      rows: tableRows,
+      width: { size: 100, type: WidthType.PERCENTAGE }
+    });
 
-  const doc = new Document({
-    sections: [{
-      children: [...paragraphs, table]
-    }]
-  });
+    const doc = new Document({
+      sections: [{
+        children: [...paragraphs, table]
+      }]
+    });
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added table with ${headers.length} columns and ${rows.length} rows to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added table with ${headers.length} columns and ${rows.length} rows to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create paragraphs from existing text
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Create table
+    const tableRows = [
+      // Header row
+      new TableRow({
+        children: headers.map((header: string) =>
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: header, bold: true })] })],
+            width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
+          })
+        )
+      }),
+      // Data rows
+      ...rows.map((row: string[]) =>
+        new TableRow({
+          children: row.map((cell: string) =>
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun(cell)] })],
+              width: { size: 100 / headers.length, type: WidthType.PERCENTAGE }
+            })
+          )
+        })
+      )
+    ];
+
+    const table = new Table({
+      rows: tableRows,
+      width: { size: 100, type: WidthType.PERCENTAGE }
+    });
+
+    const doc = new Document({
+      sections: [{
+        children: [...paragraphs, table]
+      }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added table with ${headers.length} columns and ${rows.length} rows to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function updateField(args: any): Promise<string> {
   const { filename, searchText, replaceText } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse the document with mammoth to get raw text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const docText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
-
-  // Parse the document with mammoth to get raw text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const docText = result.value;
-
-  // Check if search text exists
-  if (!docText.includes(searchText)) {
-    throw new Error(`Text "${searchText}" not found in document`);
-  }
-
-  // Replace text
-  const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
-
-  // Create new document with updated text
-  const doc = new Document({
-    sections: [{
-      children: updatedText.split('\n').map(line =>
-        new Paragraph({ children: [new TextRun(line || ' ')] })
-      )
-    }]
-  });
-
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
-
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Check if search text exists
+    if (!docText.includes(searchText)) {
+      throw new Error(`Text "${searchText}" not found in document`);
     }
-  });
 
-  return `Updated "${searchText}" to "${replaceText}" in ${docFilename}`;
+    // Replace text
+    const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
+
+    // Create new document with updated text
+    const doc = new Document({
+      sections: [{
+        children: updatedText.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun(line || ' ')] })
+        )
+      }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await updateOneDrive(docFilename, newBuffer);
+    return `Updated "${searchText}" to "${replaceText}" in ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
+    }
+
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse the document with mammoth to get raw text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const docText = result.value;
+
+    // Check if search text exists
+    if (!docText.includes(searchText)) {
+      throw new Error(`Text "${searchText}" not found in document`);
+    }
+
+    // Replace text
+    const updatedText = docText.replace(new RegExp(searchText, 'g'), replaceText);
+
+    // Create new document with updated text
+    const doc = new Document({
+      sections: [{
+        children: updatedText.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun(line || ' ')] })
+        )
+      }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Updated "${searchText}" to "${replaceText}" in ${docFilename} in Blob Storage`;
+  }
 }
 
 async function insertPageBreak(args: any): Promise<string> {
   const { filename } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document with page break
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    paragraphs.push(
+      new Paragraph({
+        children: [new PageBreak()]
+      })
+    );
 
-  // Create new document with page break
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
 
-  paragraphs.push(
-    new Paragraph({
-      children: [new PageBreak()]
-    })
-  );
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
+    await updateOneDrive(docFilename, newBuffer);
+    return `Inserted page break in ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Inserted page break in ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document with page break
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    paragraphs.push(
+      new Paragraph({
+        children: [new PageBreak()]
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Inserted page break in ${docFilename} in Blob Storage`;
+  }
 }
 
 async function formatText(args: any): Promise<string> {
   const { filename, text, bold, italic, underline, color } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    // Add formatted text
+    const textRunOptions: any = {
+      text,
+      bold: bold || false,
+      italics: italic || false
+    };
 
-  // Create new document
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
-
-  // Add formatted text
-  const textRunOptions: any = {
-    text,
-    bold: bold || false,
-    italics: italic || false
-  };
-
-  if (underline) {
-    textRunOptions.underline = { type: UnderlineType.SINGLE };
-  }
-
-  if (color) {
-    textRunOptions.color = color;
-  }
-
-  paragraphs.push(
-    new Paragraph({
-      children: [new TextRun(textRunOptions)]
-    })
-  );
-
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
-
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
-
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    if (underline) {
+      textRunOptions.underline = { type: UnderlineType.SINGLE };
     }
-  });
 
-  return `Added formatted text to ${docFilename}`;
+    if (color) {
+      textRunOptions.color = color;
+    }
+
+    paragraphs.push(
+      new Paragraph({
+        children: [new TextRun(textRunOptions)]
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added formatted text to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
+    }
+
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Add formatted text
+    const textRunOptions: any = {
+      text,
+      bold: bold || false,
+      italics: italic || false
+    };
+
+    if (underline) {
+      textRunOptions.underline = { type: UnderlineType.SINGLE };
+    }
+
+    if (color) {
+      textRunOptions.color = color;
+    }
+
+    paragraphs.push(
+      new Paragraph({
+        children: [new TextRun(textRunOptions)]
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added formatted text to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function setParagraphAlignment(args: any): Promise<string> {
   const { filename, alignment } = args;
-  // Note: This is a simplified implementation - would need more sophisticated approach for real use
-  return `Paragraph alignment set to ${alignment} in ${filename}`;
+  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Alignment map
+    const alignmentMap: any = {
+      left: AlignmentType.LEFT,
+      center: AlignmentType.CENTER,
+      right: AlignmentType.RIGHT,
+      justify: AlignmentType.JUSTIFIED
+    };
+
+    const alignmentType = alignmentMap[alignment] || AlignmentType.LEFT;
+
+    // Create new document with all paragraphs aligned (this sets alignment for the last paragraph as mentioned in tool description)
+    const lines = existingText.split('\n');
+    const paragraphs = lines.map((line, index) =>
+      new Paragraph({
+        children: [new TextRun(line || ' ')],
+        alignment: index === lines.length - 1 ? alignmentType : AlignmentType.LEFT
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await updateOneDrive(docFilename, newBuffer);
+    return `Set paragraph alignment to ${alignment} in ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
+    }
+
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Alignment map
+    const alignmentMap: any = {
+      left: AlignmentType.LEFT,
+      center: AlignmentType.CENTER,
+      right: AlignmentType.RIGHT,
+      justify: AlignmentType.JUSTIFIED
+    };
+
+    const alignmentType = alignmentMap[alignment] || AlignmentType.LEFT;
+
+    // Create new document with all paragraphs aligned (this sets alignment for the last paragraph as mentioned in tool description)
+    const lines = existingText.split('\n');
+    const paragraphs = lines.map((line, index) =>
+      new Paragraph({
+        children: [new TextRun(line || ' ')],
+        alignment: index === lines.length - 1 ? alignmentType : AlignmentType.LEFT
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Set paragraph alignment to ${alignment} in ${docFilename} in Blob Storage`;
+  }
 }
 
 async function addImage(args: any): Promise<string> {
@@ -1544,229 +2214,393 @@ async function addImage(args: any): Promise<string> {
   const imageResponse = await fetch(imageUrl);
   const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    // Add image
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: imageBuffer,
+            transformation: {
+              width: width || 600,
+              height: height || 400
+            },
+            type: 'png' // Specify image type
+          } as any) // Type assertion for compatibility
+        ]
+      })
+    );
 
-  // Create new document
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
 
-  // Add image
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new ImageRun({
-          data: imageBuffer,
-          transformation: {
-            width: width || 600,
-            height: height || 400
-          },
-          type: 'png' // Specify image type
-        } as any) // Type assertion for compatibility
-      ]
-    })
-  );
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added image to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added image to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Add image
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: imageBuffer,
+            transformation: {
+              width: width || 600,
+              height: height || 400
+            },
+            type: 'png' // Specify image type
+          } as any) // Type assertion for compatibility
+        ]
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added image to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function addHyperlink(args: any): Promise<string> {
   const { filename, text, url } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    // Add hyperlink (simplified - docx library has more complex hyperlink handling)
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: text,
+            color: '0000FF',
+            underline: { type: UnderlineType.SINGLE }
+          }),
+          new TextRun(` (${url})`)
+        ]
+      })
+    );
 
-  // Create new document
-  const paragraphs = existingText.split('\n').map(line =>
-    new Paragraph({ children: [new TextRun(line || ' ')] })
-  );
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
 
-  // Add hyperlink (simplified - docx library has more complex hyperlink handling)
-  paragraphs.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: text,
-          color: '0000FF',
-          underline: { type: UnderlineType.SINGLE }
-        }),
-        new TextRun(` (${url})`)
-      ]
-    })
-  );
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  const doc = new Document({
-    sections: [{ children: paragraphs }]
-  });
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added hyperlink "${text}" to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added hyperlink "${text}" to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document
+    const paragraphs = existingText.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || ' ')] })
+    );
+
+    // Add hyperlink (simplified - docx library has more complex hyperlink handling)
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: text,
+            color: '0000FF',
+            underline: { type: UnderlineType.SINGLE }
+          }),
+          new TextRun(` (${url})`)
+        ]
+      })
+    );
+
+    const doc = new Document({
+      sections: [{ children: paragraphs }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added hyperlink "${text}" to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function addTableOfContents(args: any): Promise<string> {
   const { filename } = args;
   const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first
+  try {
+    const buffer = await downloadFromOneDrive(docFilename);
 
-  // Download existing document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
-  }
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
 
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    // Create new document with TOC
+    const children: any[] = [
+      new Paragraph({
+        text: 'Table of Contents',
+        heading: HeadingLevel.HEADING_1
+      }),
+      new TableOfContents('Table of Contents', {
+        hyperlink: true,
+        headingStyleRange: '1-5'
+      })
+    ];
 
-  // Parse existing document text
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  const existingText = result.value;
+    // Add existing content
+    existingText.split('\n').forEach(line => {
+      children.push(new Paragraph({ children: [new TextRun(line || ' ')] }));
+    });
 
-  // Create new document with TOC
-  const children: any[] = [
-    new Paragraph({
-      text: 'Table of Contents',
-      heading: HeadingLevel.HEADING_1
-    }),
-    new TableOfContents('Table of Contents', {
-      hyperlink: true,
-      headingStyleRange: '1-5'
-    })
-  ];
+    const doc = new Document({
+      sections: [{ children }]
+    });
 
-  // Add existing content
-  existingText.split('\n').forEach(line => {
-    children.push(new Paragraph({ children: [new TextRun(line || ' ')] }));
-  });
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
 
-  const doc = new Document({
-    sections: [{ children }]
-  });
+    await updateOneDrive(docFilename, newBuffer);
+    return `Added table of contents to ${docFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
 
-  await blockBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    // Download existing document
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download document from Blob Storage');
     }
-  });
 
-  return `Added table of contents to ${docFilename}`;
+    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+
+    // Parse existing document text
+    const mammoth = await import('mammoth');
+    const result = await mammoth.extractRawText({ buffer });
+    const existingText = result.value;
+
+    // Create new document with TOC
+    const children: any[] = [
+      new Paragraph({
+        text: 'Table of Contents',
+        heading: HeadingLevel.HEADING_1
+      }),
+      new TableOfContents('Table of Contents', {
+        hyperlink: true,
+        headingStyleRange: '1-5'
+      })
+    ];
+
+    // Add existing content
+    existingText.split('\n').forEach(line => {
+      children.push(new Paragraph({ children: [new TextRun(line || ' ')] }));
+    });
+
+    const doc = new Document({
+      sections: [{ children }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await blockBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Added table of contents to ${docFilename} in Blob Storage`;
+  }
 }
 
 async function mergeDocuments(args: any): Promise<string> {
   const { sourceFilenames, targetFilename } = args;
   const targetDocFilename = targetFilename.endsWith('.docx') ? targetFilename : `${targetFilename}.docx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-
   let mergedText = '';
 
-  // Download and extract text from each source document
-  for (const sourceFilename of sourceFilenames) {
-    const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
-    const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+  // Try OneDrive first for all source documents
+  try {
+    // Download and extract text from each source document
+    for (const sourceFilename of sourceFilenames) {
+      const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
 
-    const exists = await sourceBlobClient.exists();
-    if (!exists) {
-      throw new Error(`Source document ${sourceDocFilename} not found`);
+      const buffer = await downloadFromOneDrive(sourceDocFilename);
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+
+      mergedText += result.value + '\n\n--- PAGE BREAK ---\n\n';
     }
 
-    const downloadResponse = await sourceBlobClient.download();
-    if (!downloadResponse.readableStreamBody) {
-      throw new Error(`Failed to download ${sourceDocFilename}`);
+    // Create merged document
+    const doc = new Document({
+      sections: [{
+        children: mergedText.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun(line || ' ')] })
+        )
+      }]
+    });
+
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    await uploadToOneDrive(targetDocFilename, newBuffer);
+    return `Merged ${sourceFilenames.length} documents into ${targetDocFilename} in OneDrive`;
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive operation failed (${oneDriveError.message}), trying Blob Storage...`);
+
+    // Fallback to Blob Storage
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+
+    mergedText = '';
+
+    // Download and extract text from each source document
+    for (const sourceFilename of sourceFilenames) {
+      const sourceDocFilename = sourceFilename.endsWith('.docx') ? sourceFilename : `${sourceFilename}.docx`;
+      const sourceBlobClient = containerClient.getBlockBlobClient(sourceDocFilename);
+
+      const exists = await sourceBlobClient.exists();
+      if (!exists) {
+        throw new Error(`Source document ${sourceDocFilename} not found in OneDrive or Blob Storage`);
+      }
+
+      const downloadResponse = await sourceBlobClient.download();
+      if (!downloadResponse.readableStreamBody) {
+        throw new Error(`Failed to download ${sourceDocFilename} from Blob Storage`);
+      }
+
+      const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+
+      mergedText += result.value + '\n\n--- PAGE BREAK ---\n\n';
     }
 
-    const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
-    const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ buffer });
+    // Create merged document
+    const doc = new Document({
+      sections: [{
+        children: mergedText.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun(line || ' ')] })
+        )
+      }]
+    });
 
-    mergedText += result.value + '\n\n--- PAGE BREAK ---\n\n';
+    // Convert and upload
+    const { Packer } = await import('docx');
+    const newBuffer = await Packer.toBuffer(doc);
+
+    const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
+    await targetBlobClient.uploadData(newBuffer, {
+      blobHTTPHeaders: {
+        blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }
+    });
+
+    return `Merged ${sourceFilenames.length} documents into ${targetDocFilename} in Blob Storage`;
   }
-
-  // Create merged document
-  const doc = new Document({
-    sections: [{
-      children: mergedText.split('\n').map(line =>
-        new Paragraph({ children: [new TextRun(line || ' ')] })
-      )
-    }]
-  });
-
-  // Convert and upload
-  const { Packer } = await import('docx');
-  const newBuffer = await Packer.toBuffer(doc);
-
-  const targetBlobClient = containerClient.getBlockBlobClient(targetDocFilename);
-  await targetBlobClient.uploadData(newBuffer, {
-    blobHTTPHeaders: {
-      blobContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    }
-  });
-
-  return `Merged ${sourceFilenames.length} documents into ${targetDocFilename}`;
 }
 
 async function analyzeQuestionnaire(args: any): Promise<string> {
