@@ -200,11 +200,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const entity = await tableClient.getEntity(creatorId, 'config');
       const providers = entity.providers ? JSON.parse(entity.providers as string) : {};
+      const customPrompts = entity.customPrompts ? JSON.parse(entity.customPrompts as string) : {};
       config = {
         providers,
         defaultProvider: entity.defaultProvider || 'anthropic',
         temperature: entity.temperature ?? 0.7,
         maxTokens: entity.maxTokens ?? 4096,
+        systemPrompt: entity.systemPrompt as string || '',
+        customPrompts,
       };
     } catch (error: any) {
       if (error.statusCode === 404) {
@@ -373,6 +376,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       addLog('INFO', 'OneDrive Tools', 'OneDrive not configured, skipping storage tools');
     }
 
+    // Apply custom prompts to tool descriptions
+    if (config.customPrompts && Object.keys(config.customPrompts).length > 0) {
+      addLog('INFO', 'Custom Prompts', 'Applying custom prompts to tools');
+
+      // Map custom prompt keys to tool name patterns
+      const toolMappings: Record<string, string[]> = {
+        downloadWippliFile: ['download', 'get_file', 'fetch_file'],
+        queryVectorDatabase: ['query', 'search', 'vector'],
+        populateDocumentTemplate: ['populate', 'template', 'fill'],
+        convertToPdf: ['convert', 'pdf', 'to_pdf'],
+        postWippliComment: ['comment', 'post', 'add_comment'],
+      };
+
+      for (const tool of tools) {
+        for (const [promptKey, patterns] of Object.entries(toolMappings)) {
+          const customPrompt = (config.customPrompts as any)[promptKey];
+          if (customPrompt && patterns.some(pattern => tool.name.toLowerCase().includes(pattern))) {
+            // Append custom prompt to tool description
+            tool.description = `${tool.description}\n\n${customPrompt}`;
+            addLog('SUCCESS', 'Custom Prompts', `Applied ${promptKey} to ${tool.name}`);
+          }
+        }
+      }
+    }
+
     // Call REAL AI API
     addLog('INFO', 'AI Provider', `Using ${provider} provider`);
 
@@ -399,6 +427,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       temperature: config.temperature || 0.7,
       messages: messages,
     };
+
+    // Add system prompt if configured
+    if (config.systemPrompt && config.systemPrompt.trim()) {
+      requestBody.system = config.systemPrompt;
+      addLog('INFO', 'System Prompt', 'Using custom system prompt');
+    }
 
     // Only add tools parameter if we have tools
     if (tools.length > 0) {
