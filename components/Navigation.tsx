@@ -41,8 +41,8 @@ export default function Navigation() {
     <nav style={{ backgroundColor: 'var(--branding-purple)' }} className="shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <Link href="/chat" className="flex items-center space-x-3">
+          <div className="flex items-center flex-1">
+            <Link href="/chat" className="flex items-center space-x-3 flex-shrink-0">
               <Image
                 src="/logos/wippli-logo-dark.svg"
                 alt="Wippli"
@@ -55,7 +55,7 @@ export default function Navigation() {
                 PowerNode
               </span>
             </Link>
-            <div className="hidden sm:ml-8 sm:flex sm:space-x-8 flex-1">
+            <div className="hidden sm:ml-8 sm:flex sm:space-x-2">
               {links.map((link) => {
                 const Icon = link.icon;
                 const isActive = router.pathname === link.href;
