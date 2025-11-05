@@ -31,7 +31,7 @@ export default function Navigation() {
   const links = [
     { href: '/chat', label: 'Chat', icon: MessageSquare },
     { href: '/config', label: 'Agent', icon: Settings },
-    { href: '/mcp-tools', label: 'MCP Tools', icon: Server },
+    { href: '/mcp-tools', label: 'MCP', icon: Server },
     { href: '/storage', label: 'Storage', icon: HardDrive },
     { href: '/workflows', label: 'Workflows', icon: Workflow },
     { href: '/instance-settings', label: 'Instance', icon: Layers },
@@ -44,7 +44,7 @@ export default function Navigation() {
           <div className="flex items-center">
             <Link href="/chat" className="flex items-center space-x-3 px-2">
               <Image
-                src="/logos/wippli-logo-light.svg"
+                src="/logos/wippli-logo-dark.svg"
                 alt="Wippli"
                 width={120}
                 height={32}
@@ -55,7 +55,7 @@ export default function Navigation() {
                 PowerNode
               </span>
             </Link>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-1">
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8 flex-1">
               {links.map((link) => {
                 const Icon = link.icon;
                 const isActive = router.pathname === link.href;
