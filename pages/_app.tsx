@@ -1,20 +1,18 @@
 import type { AppProps } from 'next/app';
-import { useEffect, useState } from 'react';
+import Head from 'next/head';
 import Navigation from '../components/Navigation';
-import { getInstanceConfig } from '../lib/instance-config';
 import '../styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
-  const [hideNav, setHideNav] = useState(false);
-
-  useEffect(() => {
-    const config = getInstanceConfig();
-    setHideNav(config.ui?.hideNavigation || false);
-  }, []);
-
   return (
     <>
-      {!hideNav && <Navigation />}
+      <Head>
+        <title>Wippli PowerNode</title>
+        <meta name="description" content="AI-powered workflow automation platform" />
+        <link rel="icon" href="/favicon.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+      <Navigation />
       <Component {...pageProps} />
     </>
   );

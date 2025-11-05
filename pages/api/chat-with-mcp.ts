@@ -21,12 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Extract instanceId from query parameters
-  const { instanceId } = req.query;
-
   const {
     message,
-    conversationHistory: rawConversationHistory,
+    conversationHistory,
     fileUrl,
     fileName,
     fileId,
@@ -41,67 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Message required' });
   }
 
-  // Load instance configuration if instanceId is provided
-  let instanceConfig: any = null;
-  let n8nApiUrl: string | undefined;
-  let n8nApiKey: string | undefined;
-
-  if (instanceId && typeof instanceId === 'string') {
-    try {
-      const { TableClient: InstanceTableClient } = await import('@azure/data-tables');
-      const instanceTableClient = InstanceTableClient.fromConnectionString(
-        POWERNODE_STORAGE_CONNECTION!,
-        'PowerNodeInstances'
-      );
-
-      // Find instance by row key
-      const filter = `RowKey eq '${instanceId}'`;
-      const entitiesIter = instanceTableClient.listEntities({
-        queryOptions: { filter }
-      });
-
-      for await (const entity of entitiesIter) {
-        instanceConfig = {
-          instanceId: entity.instanceId,
-          instanceName: entity.instanceName,
-          supplierId: entity.supplierId,
-          n8n: entity.n8nConfig ? JSON.parse(entity.n8nConfig as string) : undefined,
-          storage: entity.storageConfig ? JSON.parse(entity.storageConfig as string) : undefined,
-          ai: entity.aiConfig ? JSON.parse(entity.aiConfig as string) : undefined,
-        };
-        break;
-      }
-
-      if (instanceConfig && instanceConfig.n8n) {
-        n8nApiUrl = instanceConfig.n8n.apiUrl;
-        n8nApiKey = instanceConfig.n8n.apiKey;
-      }
-    } catch (error: any) {
-      console.error('Failed to load instance config:', error);
-      // Continue without instance config - will fall back to env variables
-    }
-  }
-
-  // Handle conversation history - n8n may send it as a string like "[Array: []]"
-  let conversationHistory: any[] = [];
-  if (rawConversationHistory) {
-    if (Array.isArray(rawConversationHistory)) {
-      conversationHistory = rawConversationHistory;
-    } else if (typeof rawConversationHistory === 'string') {
-      try {
-        conversationHistory = JSON.parse(rawConversationHistory);
-      } catch {
-        // If parsing fails, check if it's the "[Array: []]" string and treat as empty
-        if (rawConversationHistory.startsWith('[Array:') || rawConversationHistory === '[]') {
-          conversationHistory = [];
-        }
-      }
-    }
-  }
-
-  // Use wippliId (from request body), userId, or supplierId from instance as the effective user ID
-  // NO FALLBACK - instance must provide supplierId
-  const effectiveUserId = wippliId || userId || instanceConfig?.supplierId;
+  const effectiveUserId = userId || 'default-user';
   const effectiveConversationId = conversationId || `conv-${Date.now()}`;
 
   const logs: LogEntry[] = [];
@@ -120,12 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
-    addLog('INFO', 'PowerNode Chat', `Received message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}}"`);
-    addLog('INFO', 'Conversation History', `History length: ${conversationHistory.length} messages`, {
-      rawType: typeof rawConversationHistory,
-      rawValue: rawConversationHistory,
-      parsed: conversationHistory.length > 0 ? `${conversationHistory.length} messages` : 'empty'
-    });
+    addLog('INFO', 'PowerNode Chat', `Received message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
 
     // OneDrive File Access - Download file if provided
     let fileContent: Buffer | null = null;
@@ -256,6 +188,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { TableClient: ConfigTableClient } = await import('@azure/data-tables');
 
     const TABLE_NAME = 'powernodeconfig';
+    const creatorId = 'default-user';
 
     if (!POWERNODE_STORAGE_CONNECTION) {
       throw new Error('Storage connection not configured');
@@ -263,26 +196,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const tableClient = ConfigTableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, TABLE_NAME);
 
-    // Use instance's supplierId - NO FALLBACK
-    const effectiveCreatorId = instanceConfig?.supplierId;
-
-    if (!effectiveCreatorId) {
-      throw new Error('No supplierId provided - instance configuration required');
-    }
-    addLog('INFO', 'Config Loader', `Loading config for: ${effectiveCreatorId}${instanceConfig ? ` (from instance: ${instanceConfig.instanceId})` : ''}`);
-
     let config;
     try {
-      const entity = await tableClient.getEntity(effectiveCreatorId, 'config');
+      const entity = await tableClient.getEntity(creatorId, 'config');
       const providers = entity.providers ? JSON.parse(entity.providers as string) : {};
-      const customPrompts = entity.customPrompts ? JSON.parse(entity.customPrompts as string) : {};
       config = {
         providers,
         defaultProvider: entity.defaultProvider || 'anthropic',
         temperature: entity.temperature ?? 0.7,
         maxTokens: entity.maxTokens ?? 4096,
-        systemPrompt: entity.systemPrompt as string || '',
-        customPrompts,
       };
     } catch (error: any) {
       if (error.statusCode === 404) {
@@ -315,7 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const entities = mcpTableClient.listEntities({
-        queryOptions: { filter: `PartitionKey eq '${effectiveCreatorId}'` },
+        queryOptions: { filter: `PartitionKey eq '${creatorId}'` },
       });
 
       for await (const entity of entities) {
@@ -451,31 +373,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       addLog('INFO', 'OneDrive Tools', 'OneDrive not configured, skipping storage tools');
     }
 
-    // Apply custom prompts to tool descriptions
-    if (config.customPrompts && Object.keys(config.customPrompts).length > 0) {
-      addLog('INFO', 'Custom Prompts', 'Applying custom prompts to tools');
-
-      // Map custom prompt keys to tool name patterns
-      const toolMappings: Record<string, string[]> = {
-        downloadWippliFile: ['download', 'get_file', 'fetch_file'],
-        queryVectorDatabase: ['query', 'search', 'vector'],
-        populateDocumentTemplate: ['populate', 'template', 'fill'],
-        convertToPdf: ['convert', 'pdf', 'to_pdf'],
-        postWippliComment: ['comment', 'post', 'add_comment'],
-      };
-
-      for (const tool of tools) {
-        for (const [promptKey, patterns] of Object.entries(toolMappings)) {
-          const customPrompt = (config.customPrompts as any)[promptKey];
-          if (customPrompt && patterns.some(pattern => tool.name.toLowerCase().includes(pattern))) {
-            // Append custom prompt to tool description
-            tool.description = `${tool.description}\n\n${customPrompt}`;
-            addLog('SUCCESS', 'Custom Prompts', `Applied ${promptKey} to ${tool.name}`);
-          }
-        }
-      }
-    }
-
     // Call REAL AI API
     addLog('INFO', 'AI Provider', `Using ${provider} provider`);
 
@@ -502,12 +399,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       temperature: config.temperature || 0.7,
       messages: messages,
     };
-
-    // Add system prompt if configured
-    if (config.systemPrompt && config.systemPrompt.trim()) {
-      requestBody.system = config.systemPrompt;
-      addLog('INFO', 'System Prompt', 'Using custom system prompt');
-    }
 
     // Only add tools parameter if we have tools
     if (tools.length > 0) {
@@ -623,7 +514,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               serverId,
               toolName: originalToolName,
               arguments: toolInput,
-              userId: effectiveCreatorId,
+              userId: creatorId,
             };
 
             // Pass file information if available

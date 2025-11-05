@@ -5,12 +5,8 @@
  * enabling embedding in n8n or other platforms with instance-specific settings.
  *
  * Multi-tenant isolation:
- * - supplierId: Supplier/organization-level isolation (top-level business entity)
- * - instanceId: Per-deployment/workflow isolation
- *
- * Auto-detection:
- * - Workflow ID/Name automatically detected from n8n API when available
- * - Execution context preserved for workflow runs
+ * - user_id: Global user-level isolation (preferences, personal configs)
+ * - wippli_id: Task/workflow-level isolation (workflows, executions, MCP operations)
  */
 
 export interface InstanceConfig {
@@ -18,32 +14,14 @@ export interface InstanceConfig {
   instanceName: string;
 
   // Multi-tenant Identifiers
-  supplierId?: string;  // Supplier/organization-level isolation (replaces userId)
+  userId?: string;      // Global user-level isolation
+  wippliId?: string;    // Task/workflow-level isolation
 
   // n8n Configuration
   n8n?: {
     apiUrl: string;
     apiKey: string;
     enabled: boolean;
-    workflowId?: string;      // Auto-detected from API or user-selected
-    workflowName?: string;    // Display name for the workflow
-    executionId?: string;     // Current execution context
-  };
-
-  // Subscription & Auth
-  subscription?: {
-    stripeCustomerId?: string;
-    subscriptionId?: string;
-    status?: 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
-    currentPeriodEnd?: Date;
-    plan?: 'free' | 'starter' | 'pro' | 'enterprise';
-  };
-
-  auth?: {
-    isAuthenticated?: boolean;
-    email?: string;
-    name?: string;
-    authProvider?: 'email' | 'google' | 'microsoft';
   };
 
   // Storage Configuration
@@ -96,19 +74,15 @@ export function getInstanceConfig(): InstanceConfig {
     instanceName: urlConfig.instanceName || storedConfig?.instanceName || 'Default Instance',
 
     // Multi-tenant identifiers
-    supplierId: urlConfig.supplierId || storedConfig?.supplierId,
+    userId: urlConfig.userId || storedConfig?.userId,
+    wippliId: urlConfig.wippliId || storedConfig?.wippliId,
 
     n8n: {
       apiUrl: urlConfig.n8nApiUrl || storedConfig?.n8n?.apiUrl || '',
       apiKey: urlConfig.n8nApiKey || storedConfig?.n8n?.apiKey || '',
       enabled: !!(urlConfig.n8nApiUrl || storedConfig?.n8n?.enabled),
-      workflowId: urlConfig.n8nWorkflowId || storedConfig?.n8n?.workflowId,
-      workflowName: storedConfig?.n8n?.workflowName,
-      executionId: urlConfig.n8nExecutionId || storedConfig?.n8n?.executionId,
     },
 
-    subscription: storedConfig?.subscription,
-    auth: storedConfig?.auth,
     storage: storedConfig?.storage || {},
     ai: storedConfig?.ai || {},
     adobe: storedConfig?.adobe || {},
@@ -159,8 +133,6 @@ export function updateInstanceConfig(updates: Partial<InstanceConfig>): Instance
 function getConfigFromURL(): Partial<InstanceConfig> & {
   n8nApiUrl?: string;
   n8nApiKey?: string;
-  n8nWorkflowId?: string;
-  n8nExecutionId?: string;
   hideNavigation?: boolean;
   enabledPages?: string[];
 } {
@@ -175,11 +147,10 @@ function getConfigFromURL(): Partial<InstanceConfig> & {
   return {
     instanceId: getParam('instanceId') || undefined,
     instanceName: getParam('instanceName') || undefined,
-    supplierId: getParam('supplierId') || getParam('supplier_id') || undefined,
+    userId: getParam('userId') || getParam('user_id') || undefined,
+    wippliId: getParam('wippliId') || getParam('wippli_id') || undefined,
     n8nApiUrl: getParam('n8nApiUrl') || getParam('n8n_api_url') || undefined,
     n8nApiKey: getParam('n8nApiKey') || getParam('n8n_api_key') || undefined,
-    n8nWorkflowId: getParam('n8nWorkflowId') || getParam('workflow_id') || undefined,
-    n8nExecutionId: getParam('n8nExecutionId') || getParam('execution_id') || undefined,
     hideNavigation: getParam('hideNav') === 'true',
     enabledPages: getParam('pages')?.split(','),
   };
@@ -223,16 +194,44 @@ export function getInstanceStorageKey(baseKey: string): string {
 }
 
 /**
- * Get supplier-specific storage key
- * For organization/supplier-level data isolation
+ * Get user-specific storage key
+ * For global user-level data (preferences, personal configs)
  */
-export function getSupplierStorageKey(baseKey: string): string {
+export function getUserStorageKey(baseKey: string): string {
   const config = getInstanceConfig();
-  if (!config.supplierId) {
-    // Fallback to instance-level if no supplierId
+  if (!config.userId) {
+    // Fallback to instance-level if no user_id
     return getInstanceStorageKey(baseKey);
   }
-  return `${baseKey}-supplier-${config.supplierId}`;
+  return `${baseKey}-user-${config.userId}`;
+}
+
+/**
+ * Get wippli-specific storage key
+ * For task/workflow-level data (workflows, executions, MCP operations)
+ */
+export function getWippliStorageKey(baseKey: string): string {
+  const config = getInstanceConfig();
+  if (!config.wippliId) {
+    // Fallback to instance-level if no wippli_id
+    return getInstanceStorageKey(baseKey);
+  }
+  return `${baseKey}-wippli-${config.wippliId}`;
+}
+
+/**
+ * Get combined user+wippli storage key
+ * For data that needs both user and wippli isolation
+ */
+export function getUserWippliStorageKey(baseKey: string): string {
+  const config = getInstanceConfig();
+  if (!config.userId && !config.wippliId) {
+    return getInstanceStorageKey(baseKey);
+  }
+  const parts = [baseKey];
+  if (config.userId) parts.push(`user-${config.userId}`);
+  if (config.wippliId) parts.push(`wippli-${config.wippliId}`);
+  return parts.join('-');
 }
 
 /**
@@ -271,21 +270,17 @@ export function exportConfigAsURL(config: InstanceConfig, baseUrl?: string): str
   url.searchParams.set('instanceId', config.instanceId);
   url.searchParams.set('instanceName', config.instanceName);
 
-  if (config.supplierId) {
-    url.searchParams.set('supplierId', config.supplierId);
+  if (config.userId) {
+    url.searchParams.set('userId', config.userId);
+  }
+
+  if (config.wippliId) {
+    url.searchParams.set('wippliId', config.wippliId);
   }
 
   if (config.n8n?.enabled && config.n8n.apiUrl && config.n8n.apiKey) {
     url.searchParams.set('n8nApiUrl', config.n8n.apiUrl);
     url.searchParams.set('n8nApiKey', config.n8n.apiKey);
-
-    if (config.n8n.workflowId) {
-      url.searchParams.set('n8nWorkflowId', config.n8n.workflowId);
-    }
-
-    if (config.n8n.executionId) {
-      url.searchParams.set('n8nExecutionId', config.n8n.executionId);
-    }
   }
 
   if (config.ui?.hideNavigation) {
@@ -297,105 +292,4 @@ export function exportConfigAsURL(config: InstanceConfig, baseUrl?: string): str
   }
 
   return url.toString();
-}
-
-/**
- * API Integration Functions
- * Sync instances with Azure Table Storage via REST API
- */
-
-/**
- * Load instance from API by ID
- */
-export async function loadInstanceFromAPI(instanceId: string): Promise<InstanceConfig | null> {
-  try {
-    const response = await fetch(`/api/instances/${instanceId}`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error(`Failed to load instance: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Failed to load instance from API:', error);
-    return null;
-  }
-}
-
-/**
- * Save instance to API
- */
-export async function saveInstanceToAPI(config: InstanceConfig): Promise<boolean> {
-  try {
-    // Check if instance exists
-    const existing = await loadInstanceFromAPI(config.instanceId);
-
-    const response = existing
-      ? await fetch(`/api/instances/${config.instanceId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        })
-      : await fetch('/api/instances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        });
-
-    if (!response.ok) {
-      throw new Error(`Failed to save instance: ${response.statusText}`);
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to save instance to API:', error);
-    return false;
-  }
-}
-
-/**
- * Delete instance from API
- */
-export async function deleteInstanceFromAPI(instanceId: string): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/instances/${instanceId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to delete instance: ${response.statusText}`);
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to delete instance from API:', error);
-    return false;
-  }
-}
-
-/**
- * List all instances (optionally filtered by supplierId)
- */
-export async function listInstancesFromAPI(supplierId?: string): Promise<InstanceConfig[]> {
-  try {
-    const url = supplierId
-      ? `/api/instances?supplierId=${encodeURIComponent(supplierId)}`
-      : '/api/instances';
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to list instances: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.instances || [];
-  } catch (error) {
-    console.error('Failed to list instances from API:', error);
-    return [];
-  }
 }

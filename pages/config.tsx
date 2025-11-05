@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
 import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check, Send, MessageSquare, Cloud } from 'lucide-react';
 import OneDriveConfigModal from '../components/OneDriveConfigModal';
-import { getInstanceConfig } from '../lib/instance-config';
 
 interface AIProvider {
   enabled: boolean;
@@ -57,16 +55,6 @@ const providerInfo = {
 };
 
 export default function ConfigPage() {
-  const router = useRouter();
-  const [supplierId, setSupplierId] = useState<string>(() => {
-    // Initialize from instance config on mount
-    if (typeof window !== 'undefined') {
-      const instanceConfig = getInstanceConfig();
-      return instanceConfig.supplierId || 'default-user';
-    }
-    return 'default-user';
-  });
-
   const [config, setConfig] = useState<PowerNodeConfig>({
     providers: {
       openai: { enabled: false, apiKey: '', model: 'gpt-4o' },
@@ -99,23 +87,13 @@ export default function ConfigPage() {
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
 
-  // Load supplierId from instance config (auto-detects from URL or localStorage)
   useEffect(() => {
-    const instanceConfig = getInstanceConfig();
-    if (instanceConfig.supplierId) {
-      setSupplierId(instanceConfig.supplierId);
-    }
+    loadConfig();
   }, []);
-
-  useEffect(() => {
-    if (supplierId) {
-      loadConfig();
-    }
-  }, [supplierId]);
 
   const loadConfig = async () => {
     try {
-      const response = await fetch(`/api/config?creatorId=${encodeURIComponent(supplierId)}`);
+      const response = await fetch('/api/config');
       if (response.ok) {
         const data = await response.json();
 
@@ -142,7 +120,7 @@ export default function ConfigPage() {
     setSaved(false);
 
     try {
-      const response = await fetch(`/api/config?creatorId=${encodeURIComponent(supplierId)}`, {
+      const response = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -430,11 +408,6 @@ export default function ConfigPage() {
           <p className="text-gray-600">
             Configure AI providers with your own API keys - enable the providers you want to use
           </p>
-          {supplierId !== 'default-user' && (
-            <div className="mt-3 inline-flex items-center px-3 py-1 rounded-md bg-blue-50 border border-blue-200">
-              <span className="text-sm font-medium text-blue-800">Configuring for: {supplierId}</span>
-            </div>
-          )}
         </div>
 
         {/* Status Messages */}

@@ -1,13 +1,14 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Home, MessageSquare, Settings, Server, FileText, Workflow, HardDrive, Clock, Layers, FolderGit2 } from 'lucide-react';
+import { Home, MessageSquare, Settings, Server, FileText, Workflow, HardDrive, Clock, Layers } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function Navigation() {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState('');
   const [timezone, setTimezone] = useState('');
-  const [modelName, setModelName] = useState('No model loaded');
+  const [modelName, setModelName] = useState('Claude Sonnet 3.5');
 
   useEffect(() => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -22,43 +23,65 @@ export default function Navigation() {
     updateTime();
     const interval = setInterval(updateTime, 1000);
 
-    // Fetch config and determine which model is loaded
-    fetch('/api/config').then(res => res.json()).then(data => {
-      if (data.defaultProvider && data.providers) {
-        const provider = data.providers[data.defaultProvider];
-        if (provider && provider.enabled && provider.model) {
-          setModelName(provider.model);
-        }
-      }
-    }).catch(() => {});
+    fetch('/api/config').then(res => res.json()).then(data => { if (data.anthropicModel) { setModelName(data.anthropicModel); } }).catch(() => {});
 
     return () => clearInterval(interval);
   }, []);
 
   const links = [
-    { href: '/', label: 'Dashboard', icon: Home },
     { href: '/chat', label: 'Chat', icon: MessageSquare },
     { href: '/config', label: 'Agent', icon: Settings },
     { href: '/mcp-tools', label: 'MCP Tools', icon: Server },
     { href: '/storage', label: 'Storage', icon: HardDrive },
-    { href: '/logs', label: 'Logs', icon: FileText },
     { href: '/workflows', label: 'Workflows', icon: Workflow },
-    { href: '/instances', label: 'Instances', icon: FolderGit2 },
-    { href: '/instance-settings', label: 'Settings', icon: Layers },
+    { href: '/instance-settings', label: 'Instance', icon: Layers },
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <nav style={{ backgroundColor: 'var(--branding-purple)' }} className="shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center px-2 text-gray-900 font-semibold text-lg">PowerNode</Link>
+            <Link href="/chat" className="flex items-center space-x-3 px-2">
+              <Image
+                src="/logos/wippli-logo-light.svg"
+                alt="Wippli"
+                width={120}
+                height={32}
+                priority
+                className="h-8 w-auto"
+              />
+              <span className="text-white font-semibold text-lg border-l pl-3" style={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}>
+                PowerNode
+              </span>
+            </Link>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-1">
               {links.map((link) => {
                 const Icon = link.icon;
                 const isActive = router.pathname === link.href;
                 return (
-                  <Link key={link.href} href={link.href} className={`inline-flex items-center px-3 py-2 text-sm font-medium transition-colors border-b-2 ${isActive ? 'border-primary text-primary' : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'}`}>
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium transition-all duration-200"
+                    style={{
+                      color: isActive ? 'white' : 'rgba(255, 255, 255, 0.85)',
+                      backgroundColor: isActive ? 'var(--branding-purple-hover)' : 'transparent',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.color = 'white';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)';
+                      }
+                    }}
+                  >
                     <Icon className="w-4 h-4 mr-1.5" />
                     {link.label}
                   </Link>
@@ -66,13 +89,13 @@ export default function Navigation() {
               })}
             </div>
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <Clock className="w-4 h-4 mr-2" />
-            <span className="font-mono">{currentTime}</span>
-            <span className="mx-2 text-gray-400">|</span>
-            <span className="text-xs">{timezone}</span>
-            <span className="mx-2 text-gray-400">|</span>
-            <span className="text-xs font-medium">{modelName}</span>
+          <div className="flex items-center text-sm text-white space-x-2">
+            <Clock className="w-4 h-4" style={{ opacity: 0.85 }} />
+            <span className="font-mono font-medium">{currentTime}</span>
+            <span style={{ opacity: 0.4 }}>|</span>
+            <span className="text-xs" style={{ opacity: 0.85 }}>{timezone}</span>
+            <span style={{ opacity: 0.4 }}>|</span>
+            <span className="text-xs font-medium bg-white bg-opacity-20 px-2 py-1 rounded" style={{ opacity: 0.95 }}>{modelName}</span>
           </div>
         </div>
       </div>
@@ -82,7 +105,15 @@ export default function Navigation() {
             const Icon = link.icon;
             const isActive = router.pathname === link.href;
             return (
-              <Link key={link.href} href={link.href} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${isActive ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'}`}>
+              <Link
+                key={link.href}
+                href={link.href}
+                className="flex items-center px-3 py-2 text-base font-medium rounded-md transition-colors"
+                style={{
+                  backgroundColor: isActive ? 'var(--branding-purple-hover)' : 'transparent',
+                  color: 'white',
+                }}
+              >
                 <Icon className="w-5 h-5 mr-2" />
                 {link.label}
               </Link>

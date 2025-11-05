@@ -1,73 +1,29 @@
 import { useState, useEffect } from 'react';
+import Navigation from '../components/Navigation';
 import {
   getInstanceConfig,
   saveInstanceConfig,
   updateInstanceConfig,
   exportConfigAsURL,
   isEmbeddedMode,
-  saveInstanceToAPI,
-  listInstancesFromAPI,
   type InstanceConfig,
 } from '../lib/instance-config';
-import { Copy, Check, Download, Upload, RefreshCw, Cloud, Plus, FileJson } from 'lucide-react';
+import { Copy, Check, Download, Upload, RefreshCw } from 'lucide-react';
 
 export default function InstanceSettings() {
   const [config, setConfig] = useState<InstanceConfig | null>(null);
   const [copied, setCopied] = useState(false);
-  const [copiedInstanceUrl, setCopiedInstanceUrl] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [savedToCloud, setSavedToCloud] = useState(false);
-  const [savingToCloud, setSavingToCloud] = useState(false);
-  const [hasBeenSavedToCloud, setHasBeenSavedToCloud] = useState(false);
-  const [instanceList, setInstanceList] = useState<InstanceConfig[]>([]);
-  const [loadingInstances, setLoadingInstances] = useState(true);
 
   useEffect(() => {
     setConfig(getInstanceConfig());
-    loadInstances();
   }, []);
-
-  const loadInstances = async () => {
-    setLoadingInstances(true);
-    const instances = await listInstancesFromAPI();
-    setInstanceList(instances);
-    setLoadingInstances(false);
-  };
 
   const handleSave = () => {
     if (!config) return;
     saveInstanceConfig(config);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleSaveToCloud = async () => {
-    if (!config) return;
-    setSavingToCloud(true);
-
-    try {
-      const success = await saveInstanceToAPI(config);
-      if (success) {
-        setSavedToCloud(true);
-        setHasBeenSavedToCloud(true);
-        setTimeout(() => setSavedToCloud(false), 2000);
-      } else {
-        alert('Failed to save instance to cloud. Check console for details.');
-      }
-    } catch (error) {
-      console.error('Error saving to cloud:', error);
-      alert('Failed to save instance to cloud. Check console for details.');
-    } finally {
-      setSavingToCloud(false);
-    }
-  };
-
-  const handleCopyInstanceUrl = () => {
-    if (!config) return;
-    const url = `https://powernode.wippli.ai?instanceId=${config.instanceId}`;
-    navigator.clipboard.writeText(url);
-    setCopiedInstanceUrl(true);
-    setTimeout(() => setCopiedInstanceUrl(false), 2000);
   };
 
   const handleCopyURL = () => {
@@ -120,6 +76,8 @@ export default function InstanceSettings() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {!config.ui?.hideNavigation && <Navigation />}
+
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h1 className="text-2xl font-bold mb-2">Instance Settings</h1>
@@ -168,16 +126,30 @@ export default function InstanceSettings() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Supplier ID
+                  User ID
                 </label>
                 <input
                   type="text"
-                  value={config.supplierId || ''}
-                  onChange={(e) => setConfig({ ...config, supplierId: e.target.value })}
+                  value={config.userId || ''}
+                  onChange={(e) => setConfig({ ...config, userId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="supplier-123"
+                  placeholder="user-123"
                 />
-                <p className="text-xs text-gray-500 mt-1">Organization/supplier-level isolation for multi-tenant environments</p>
+                <p className="text-xs text-gray-500 mt-1">Global user-level isolation (preferences, configs)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Wippli ID
+                </label>
+                <input
+                  type="text"
+                  value={config.wippliId || ''}
+                  onChange={(e) => setConfig({ ...config, wippliId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="wippli-456"
+                />
+                <p className="text-xs text-gray-500 mt-1">Task/workflow-level isolation (workflows, executions)</p>
               </div>
             </div>
           </div>
@@ -301,16 +273,7 @@ export default function InstanceSettings() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
             >
               {saved ? <Check className="w-4 h-4" /> : null}
-              {saved ? 'Saved!' : 'Save Locally'}
-            </button>
-
-            <button
-              onClick={handleSaveToCloud}
-              disabled={savingToCloud}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {savedToCloud ? <Check className="w-4 h-4" /> : <Cloud className="w-4 h-4" />}
-              {savingToCloud ? 'Saving...' : savedToCloud ? 'Saved to Cloud!' : 'Save to Cloud'}
+              {saved ? 'Saved!' : 'Save Configuration'}
             </button>
 
             <button
@@ -349,52 +312,6 @@ export default function InstanceSettings() {
             </button>
           </div>
         </div>
-
-        {/* HOW TO USE - Prominently displayed after save */}
-        {hasBeenSavedToCloud && (
-          <div className="bg-green-50 border-2 border-green-500 rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-xl font-bold text-green-900 mb-4 flex items-center gap-2">
-              <Check className="w-6 h-6" />
-              Instance Saved! Ready to Use in n8n
-            </h2>
-
-            <div className="bg-white rounded-lg p-4 mb-4">
-              <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase">
-                Step 1: Copy This URL
-              </h3>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={`https://powernode.wippli.ai?instanceId=${config.instanceId}`}
-                  readOnly
-                  className="flex-1 px-3 py-2 border-2 border-green-500 rounded-md bg-green-50 font-mono text-sm"
-                />
-                <button
-                  onClick={handleCopyInstanceUrl}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 whitespace-nowrap"
-                >
-                  {copiedInstanceUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {copiedInstanceUrl ? 'Copied!' : 'Copy URL'}
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-4">
-              <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase">
-                Step 2: Paste in n8n
-              </h3>
-              <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
-                <li>Open your n8n workflow</li>
-                <li>Add an <strong>HTTP Request</strong> node or browser/iframe node</li>
-                <li>Paste the URL above as the target</li>
-                <li>PowerNode will automatically load your saved configuration!</li>
-              </ul>
-              <p className="text-xs text-green-700 mt-3 bg-green-100 p-2 rounded">
-                Your n8n API credentials are securely stored in Azure - no need to pass them in the URL!
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Usage Examples */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

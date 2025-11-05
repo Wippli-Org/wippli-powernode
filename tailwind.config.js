@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#3b82f6',
+        primary: '#502E91', // Wippli Purple
       },
     },
   },

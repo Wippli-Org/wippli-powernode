@@ -187,13 +187,10 @@ export default function ChatPage() {
 
     try {
       // Get userId and wippliId
-      const userId = localStorage.getItem('user_id') || '';
+      const userId = localStorage.getItem('user_id') || 'default-user';
       const wippliId = localStorage.getItem('wippli_id') || '';
 
-      // Use default instance for supplier-60
-      const instanceId = 'default';
-
-      const response = await fetch(`/api/chat-with-mcp?instanceId=${instanceId}`, {
+      const response = await fetch('/api/chat-with-mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

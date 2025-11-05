@@ -201,10 +201,11 @@ export default function OneDriveConfigModal({ isOpen, onClose, userId }: OneDriv
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">OneDrive OAuth Configuration</h2>
+            <h2 className="h4">OneDrive OAuth Configuration</h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              style={{ color: 'var(--branding-grey-500)' }}
+              className="hover:text-gray-700"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -281,14 +282,17 @@ export default function OneDriveConfigModal({ isOpen, onClose, userId }: OneDriv
               <button
                 onClick={handleSave}
                 disabled={loading}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="primary__button flex-1"
               >
                 {loading ? 'Saving...' : 'Save Configuration'}
               </button>
               <button
                 onClick={handleDelete}
                 disabled={loading}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="secondary__button"
+                style={{ borderColor: 'var(--branding-error)', color: 'var(--branding-error)' }}
+                onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = 'var(--branding-error-light)')}
+                onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = 'white')}
               >
                 Delete
               </button>
@@ -312,7 +316,8 @@ export default function OneDriveConfigModal({ isOpen, onClose, userId }: OneDriv
                     <button
                       onClick={handleRefreshToken}
                       disabled={loading}
-                      className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400"
+                      className="primary__button text-sm"
+                      style={{ padding: 'var(--spacing-xs) var(--spacing-md)' }}
                     >
                       Refresh Token
                     </button>
@@ -323,7 +328,10 @@ export default function OneDriveConfigModal({ isOpen, onClose, userId }: OneDriv
               <div className="space-y-3">
                 <button
                   onClick={handleAuthorize}
-                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+                  className="primary__button w-full"
+                  style={{ backgroundColor: 'var(--branding-success)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#15803D'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--branding-success)'}
                 >
                   1. Authorize with Microsoft
                 </button>
@@ -343,7 +351,7 @@ export default function OneDriveConfigModal({ isOpen, onClose, userId }: OneDriv
                     <button
                       onClick={handleExchangeCode}
                       disabled={loading || !authorizationCode.trim()}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      className="primary__button"
                     >
                       Exchange
                     </button>
