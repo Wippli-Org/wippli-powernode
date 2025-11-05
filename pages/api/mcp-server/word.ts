@@ -294,7 +294,7 @@ async function uploadToOneDrive(filename: string, buffer: Buffer, userId: string
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       },
-      body: buffer,
+      body: buffer as any,
     }
   );
 
@@ -342,7 +342,7 @@ async function updateOneDrive(fileIdOrFilename: string, buffer: Buffer, userId: 
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       },
-      body: buffer,
+      body: buffer as any,
     }
   );
 
