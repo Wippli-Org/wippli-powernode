@@ -21,6 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Extract instanceId from query parameters
+  const { instanceId } = req.query;
+
   const {
     message,
     conversationHistory: rawConversationHistory,
@@ -36,6 +39,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!message) {
     return res.status(400).json({ error: 'Message required' });
+  }
+
+  // Load instance configuration if instanceId is provided
+  let instanceConfig: any = null;
+  let n8nApiUrl: string | undefined;
+  let n8nApiKey: string | undefined;
+
+  if (instanceId && typeof instanceId === 'string') {
+    try {
+      const { TableClient: InstanceTableClient } = await import('@azure/data-tables');
+      const instanceTableClient = InstanceTableClient.fromConnectionString(
+        POWERNODE_STORAGE_CONNECTION!,
+        'PowerNodeInstances'
+      );
+
+      // Find instance by row key
+      const filter = `RowKey eq '${instanceId}'`;
+      const entitiesIter = instanceTableClient.listEntities({
+        queryOptions: { filter }
+      });
+
+      for await (const entity of entitiesIter) {
+        instanceConfig = {
+          instanceId: entity.instanceId,
+          instanceName: entity.instanceName,
+          supplierId: entity.supplierId,
+          n8n: entity.n8nConfig ? JSON.parse(entity.n8nConfig as string) : undefined,
+          storage: entity.storageConfig ? JSON.parse(entity.storageConfig as string) : undefined,
+          ai: entity.aiConfig ? JSON.parse(entity.aiConfig as string) : undefined,
+        };
+        break;
+      }
+
+      if (instanceConfig && instanceConfig.n8n) {
+        n8nApiUrl = instanceConfig.n8n.apiUrl;
+        n8nApiKey = instanceConfig.n8n.apiKey;
+      }
+    } catch (error: any) {
+      console.error('Failed to load instance config:', error);
+      // Continue without instance config - will fall back to env variables
+    }
   }
 
   // Handle conversation history - n8n may send it as a string like "[Array: []]"
@@ -55,7 +99,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  const effectiveUserId = userId || 'default-user';
+  // Use wippliId (from request body), userId, or supplierId from instance as the effective user ID
+  const effectiveUserId = wippliId || userId || instanceConfig?.supplierId || 'default-user';
   const effectiveConversationId = conversationId || `conv-${Date.now()}`;
 
   const logs: LogEntry[] = [];
@@ -218,9 +263,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const tableClient = ConfigTableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, TABLE_NAME);
 
+    // Use instance's supplierId if available, otherwise fall back to default-user
+    const effectiveCreatorId = instanceConfig?.supplierId || creatorId;
+    addLog('INFO', 'Config Loader', `Loading config for: ${effectiveCreatorId}${instanceConfig ? ` (from instance: ${instanceConfig.instanceId})` : ''}`);
+
     let config;
     try {
-      const entity = await tableClient.getEntity(creatorId, 'config');
+      const entity = await tableClient.getEntity(effectiveCreatorId, 'config');
       const providers = entity.providers ? JSON.parse(entity.providers as string) : {};
       const customPrompts = entity.customPrompts ? JSON.parse(entity.customPrompts as string) : {};
       config = {
@@ -262,7 +311,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const entities = mcpTableClient.listEntities({
-        queryOptions: { filter: `PartitionKey eq '${creatorId}'` },
+        queryOptions: { filter: `PartitionKey eq '${effectiveCreatorId}'` },
       });
 
       for await (const entity of entities) {
