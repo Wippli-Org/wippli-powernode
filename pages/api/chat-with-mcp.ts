@@ -100,7 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Use wippliId (from request body), userId, or supplierId from instance as the effective user ID
-  const effectiveUserId = wippliId || userId || instanceConfig?.supplierId || 'default-user';
+  // NO FALLBACK - instance must provide supplierId
+  const effectiveUserId = wippliId || userId || instanceConfig?.supplierId;
   const effectiveConversationId = conversationId || `conv-${Date.now()}`;
 
   const logs: LogEntry[] = [];
@@ -255,7 +256,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { TableClient: ConfigTableClient } = await import('@azure/data-tables');
 
     const TABLE_NAME = 'powernodeconfig';
-    const creatorId = 'default-user';
 
     if (!POWERNODE_STORAGE_CONNECTION) {
       throw new Error('Storage connection not configured');
@@ -263,8 +263,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const tableClient = ConfigTableClient.fromConnectionString(POWERNODE_STORAGE_CONNECTION, TABLE_NAME);
 
-    // Use instance's supplierId if available, otherwise fall back to default-user
-    const effectiveCreatorId = instanceConfig?.supplierId || creatorId;
+    // Use instance's supplierId - NO FALLBACK
+    const effectiveCreatorId = instanceConfig?.supplierId;
+
+    if (!effectiveCreatorId) {
+      throw new Error('No supplierId provided - instance configuration required');
+    }
     addLog('INFO', 'Config Loader', `Loading config for: ${effectiveCreatorId}${instanceConfig ? ` (from instance: ${instanceConfig.instanceId})` : ''}`);
 
     let config;
