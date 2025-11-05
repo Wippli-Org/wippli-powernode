@@ -137,6 +137,151 @@ async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Bu
   });
 }
 
+// OneDrive integration helpers
+const ONEDRIVE_TABLE_NAME = 'powernodeOneDriveConfig';
+
+async function refreshOneDriveToken(clientId: string, clientSecret: string, refreshToken: string, tenantId: string) {
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+      scope: 'Files.ReadWrite offline_access User.Read',
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OneDrive token refresh failed: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+async function getOneDriveAccessToken(userId: string = 'default-user'): Promise<string> {
+  const connectionString = process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!connectionString) {
+    throw new Error('Storage connection not configured for OneDrive');
+  }
+
+  const tableClient = TableClient.fromConnectionString(connectionString, ONEDRIVE_TABLE_NAME);
+  const entity = await tableClient.getEntity(userId, 'onedrive-config');
+
+  let accessToken = entity.accessToken as string;
+  const refreshToken = entity.refreshToken as string;
+  const expiresAt = entity.expiresAt as string;
+  const clientId = entity.clientId as string;
+  const clientSecret = entity.clientSecret as string;
+  const tenantId = entity.tenantId as string;
+
+  // Refresh token if expired
+  if (new Date(expiresAt) <= new Date()) {
+    console.log('OneDrive access token expired, refreshing...');
+    const tokenData = await refreshOneDriveToken(clientId, clientSecret, refreshToken, tenantId);
+    accessToken = tokenData.access_token;
+
+    // Update stored token
+    await tableClient.updateEntity({
+      partitionKey: entity.partitionKey as string,
+      rowKey: entity.rowKey as string,
+      accessToken,
+      refreshToken: tokenData.refresh_token || refreshToken,
+      expiresAt: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+      clientId,
+      clientSecret,
+      tenantId,
+      scopes: entity.scopes as string,
+    }, 'Merge');
+  }
+
+  return accessToken;
+}
+
+async function downloadFromOneDrive(fileIdOrFilename: string, userId: string = 'default-user'): Promise<Buffer> {
+  const accessToken = await getOneDriveAccessToken(userId);
+
+  // Try as file ID first, then try searching by filename
+  let downloadUrl: string;
+
+  try {
+    // Get file metadata with download URL
+    const metadataResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileIdOrFilename}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+
+    if (metadataResponse.ok) {
+      const metadata = await metadataResponse.json();
+      downloadUrl = metadata['@microsoft.graph.downloadUrl'];
+    } else {
+      // If not found by ID, try searching by filename
+      const searchResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root/children?$filter=name eq '${encodeURIComponent(fileIdOrFilename)}'`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+
+      if (!searchResponse.ok) {
+        throw new Error(`OneDrive file not found: ${fileIdOrFilename}`);
+      }
+
+      const searchData = await searchResponse.json();
+      if (searchData.value && searchData.value.length > 0) {
+        downloadUrl = searchData.value[0]['@microsoft.graph.downloadUrl'];
+      } else {
+        throw new Error(`OneDrive file not found: ${fileIdOrFilename}`);
+      }
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to get OneDrive file metadata: ${error.message}`);
+  }
+
+  if (!downloadUrl) {
+    throw new Error('No download URL available for this OneDrive file');
+  }
+
+  // Download file content
+  const downloadResponse = await fetch(downloadUrl);
+  if (!downloadResponse.ok) {
+    throw new Error(`Failed to download OneDrive file: ${downloadResponse.statusText}`);
+  }
+
+  const arrayBuffer = await downloadResponse.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+async function listOneDriveDocuments(userId: string = 'default-user'): Promise<any[]> {
+  try {
+    const accessToken = await getOneDriveAccessToken(userId);
+
+    // List files from OneDrive root
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to list OneDrive files: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const docxFiles = data.value
+      .filter((item: any) => item.name && item.name.endsWith('.docx'))
+      .map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        size: item.size,
+        lastModified: item.lastModifiedDateTime,
+        source: 'OneDrive'
+      }));
+
+    return docxFiles;
+  } catch (error: any) {
+    console.log(`Failed to list OneDrive documents: ${error.message}`);
+    return [];
+  }
+}
+
 // Tool definitions (MCP protocol)
 const TOOLS = [
   // DOCUMENT MANAGEMENT
@@ -164,13 +309,13 @@ const TOOLS = [
   },
   {
     name: 'read_document',
-    description: 'Read and extract content from a Word document',
+    description: 'Read and extract content from a Word document. Supports OneDrive file IDs, OneDrive filenames, or Azure Blob Storage filenames.',
     inputSchema: {
       type: 'object',
       properties: {
         filename: {
           type: 'string',
-          description: 'Document filename (.docx file)'
+          description: 'Document filename (.docx file) or OneDrive file ID'
         }
       },
       required: ['filename']
@@ -178,7 +323,7 @@ const TOOLS = [
   },
   {
     name: 'list_documents',
-    description: 'List all .docx Word documents in Azure Blob Storage',
+    description: 'List all .docx Word documents from both OneDrive and Azure Blob Storage',
     inputSchema: {
       type: 'object',
       properties: {
@@ -664,27 +809,46 @@ async function createDocument(args: any): Promise<string> {
 
 async function readDocument(args: any): Promise<string> {
   const { filename } = args;
-  const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+  let buffer: Buffer;
+  let source: string;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+  // Try OneDrive first (supports both file IDs and filenames)
+  try {
+    buffer = await downloadFromOneDrive(filename);
+    source = 'OneDrive';
+    console.log(`Successfully read document from OneDrive: ${filename}`);
+  } catch (oneDriveError: any) {
+    console.log(`OneDrive read failed (${oneDriveError.message}), trying Blob Storage...`);
 
-  // Download document
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download document');
+    // Fallback to Blob Storage
+    try {
+      const docFilename = filename.endsWith('.docx') ? filename : `${filename}.docx`;
+      const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+      const blobClient = getBlobClient();
+      const containerClient = blobClient.getContainerClient(containerName);
+      const blockBlobClient = containerClient.getBlockBlobClient(docFilename);
+
+      // Download document
+      const downloadResponse = await blockBlobClient.download();
+      if (!downloadResponse.readableStreamBody) {
+        throw new Error('Failed to download document from Blob Storage');
+      }
+
+      buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+      source = 'Blob Storage';
+      console.log(`Successfully read document from Blob Storage: ${docFilename}`);
+    } catch (blobError: any) {
+      throw new Error(`Document not found in OneDrive or Blob Storage: ${filename}. OneDrive error: ${oneDriveError.message}. Blob error: ${blobError.message}`);
+    }
   }
-
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   // Parse with mammoth
   const mammoth = await import('mammoth');
   const result = await mammoth.extractRawText({ buffer });
 
   return JSON.stringify({
-    filename: docFilename,
+    filename,
+    source,
     text: result.value,
     length: result.value.length
   }, null, 2);
@@ -692,23 +856,42 @@ async function readDocument(args: any): Promise<string> {
 
 async function listDocuments(args: any): Promise<string> {
   const { prefix } = args;
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-
   const documents: any[] = [];
 
-  for await (const blob of containerClient.listBlobsFlat({ prefix })) {
-    if (blob.name.endsWith('.docx')) {
-      documents.push({
-        name: blob.name,
-        size: blob.properties.contentLength,
-        lastModified: blob.properties.lastModified
-      });
-    }
+  // Get OneDrive documents
+  try {
+    const oneDriveDocs = await listOneDriveDocuments();
+    documents.push(...oneDriveDocs);
+  } catch (error: any) {
+    console.log(`Failed to list OneDrive documents: ${error.message}`);
   }
 
-  return JSON.stringify(documents, null, 2);
+  // Get Blob Storage documents
+  try {
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+
+    for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+      if (blob.name.endsWith('.docx')) {
+        documents.push({
+          name: blob.name,
+          size: blob.properties.contentLength,
+          lastModified: blob.properties.lastModified,
+          source: 'Blob Storage'
+        });
+      }
+    }
+  } catch (error: any) {
+    console.log(`Failed to list Blob Storage documents: ${error.message}`);
+  }
+
+  // Apply prefix filter if specified
+  const filteredDocs = prefix
+    ? documents.filter(doc => doc.name.startsWith(prefix))
+    : documents;
+
+  return JSON.stringify(filteredDocs, null, 2);
 }
 
 async function deleteDocument(args: any): Promise<string> {
