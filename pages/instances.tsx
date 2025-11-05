@@ -87,7 +87,7 @@ export default function Instances() {
               parameters: [
                 {
                   name: 'message',
-                  value: '={{ $json.message || "" }}'
+                  value: '={{ $json.message || "Hello" }}'
                 },
                 {
                   name: 'conversationHistory',
@@ -113,7 +113,7 @@ export default function Instances() {
           typeVersion: 4.2,
           position: [820, 300],
           id: generateInstanceId(),
-          name: `PowerNode - ${selectedInstance.instanceName}`
+          name: `Wippli PowerNode ${selectedInstance.instanceId}`
         }
       ],
       connections: {},
