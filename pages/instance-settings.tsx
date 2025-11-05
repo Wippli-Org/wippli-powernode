@@ -6,9 +6,10 @@ import {
   exportConfigAsURL,
   isEmbeddedMode,
   saveInstanceToAPI,
+  listInstancesFromAPI,
   type InstanceConfig,
 } from '../lib/instance-config';
-import { Copy, Check, Download, Upload, RefreshCw, Cloud } from 'lucide-react';
+import { Copy, Check, Download, Upload, RefreshCw, Cloud, Plus, FileJson } from 'lucide-react';
 
 export default function InstanceSettings() {
   const [config, setConfig] = useState<InstanceConfig | null>(null);
@@ -18,10 +19,20 @@ export default function InstanceSettings() {
   const [savedToCloud, setSavedToCloud] = useState(false);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [hasBeenSavedToCloud, setHasBeenSavedToCloud] = useState(false);
+  const [instanceList, setInstanceList] = useState<InstanceConfig[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(true);
 
   useEffect(() => {
     setConfig(getInstanceConfig());
+    loadInstances();
   }, []);
+
+  const loadInstances = async () => {
+    setLoadingInstances(true);
+    const instances = await listInstancesFromAPI();
+    setInstanceList(instances);
+    setLoadingInstances(false);
+  };
 
   const handleSave = () => {
     if (!config) return;

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Home, MessageSquare, Settings, Server, FileText, Workflow, HardDrive, Clock, Layers } from 'lucide-react';
+import { Home, MessageSquare, Settings, Server, FileText, Workflow, HardDrive, Clock, Layers, FolderGit2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function Navigation() {
@@ -35,7 +35,8 @@ export default function Navigation() {
     { href: '/storage', label: 'Storage', icon: HardDrive },
     { href: '/logs', label: 'Logs', icon: FileText },
     { href: '/workflows', label: 'Workflows', icon: Workflow },
-    { href: '/instance-settings', label: 'Instance', icon: Layers },
+    { href: '/instances', label: 'Instances', icon: FolderGit2 },
+    { href: '/instance-settings', label: 'Settings', icon: Layers },
   ];
 
   return (
