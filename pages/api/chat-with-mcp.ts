@@ -623,7 +623,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               serverId,
               toolName: originalToolName,
               arguments: toolInput,
-              userId: creatorId,
+              userId: effectiveCreatorId,
             };
 
             // Pass file information if available
