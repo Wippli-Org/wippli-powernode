@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { RefreshCw, Save, Eye, EyeOff, AlertCircle, CheckCircle, ExternalLink, Check, Send, MessageSquare, Cloud } from 'lucide-react';
 import OneDriveConfigModal from '../components/OneDriveConfigModal';
 
@@ -55,6 +56,9 @@ const providerInfo = {
 };
 
 export default function ConfigPage() {
+  const router = useRouter();
+  const [supplierId, setSupplierId] = useState<string>('default-user');
+
   const [config, setConfig] = useState<PowerNodeConfig>({
     providers: {
       openai: { enabled: false, apiKey: '', model: 'gpt-4o' },
@@ -87,13 +91,25 @@ export default function ConfigPage() {
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
 
+  // Load supplierId from URL query parameter
   useEffect(() => {
-    loadConfig();
-  }, []);
+    if (router.isReady) {
+      const supplierIdParam = router.query.supplierId as string;
+      if (supplierIdParam) {
+        setSupplierId(supplierIdParam);
+      }
+    }
+  }, [router.isReady, router.query.supplierId]);
+
+  useEffect(() => {
+    if (supplierId) {
+      loadConfig();
+    }
+  }, [supplierId]);
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('/api/config');
+      const response = await fetch(`/api/config?creatorId=${encodeURIComponent(supplierId)}`);
       if (response.ok) {
         const data = await response.json();
 
@@ -120,7 +136,7 @@ export default function ConfigPage() {
     setSaved(false);
 
     try {
-      const response = await fetch('/api/config', {
+      const response = await fetch(`/api/config?creatorId=${encodeURIComponent(supplierId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -408,6 +424,11 @@ export default function ConfigPage() {
           <p className="text-gray-600">
             Configure AI providers with your own API keys - enable the providers you want to use
           </p>
+          {supplierId !== 'default-user' && (
+            <div className="mt-3 inline-flex items-center px-3 py-1 rounded-md bg-blue-50 border border-blue-200">
+              <span className="text-sm font-medium text-blue-800">Configuring for: {supplierId}</span>
+            </div>
+          )}
         </div>
 
         {/* Status Messages */}
