@@ -16,7 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const creatorId = (req.query.creatorId as string) || 'default-user';
+  const creatorId = req.query.creatorId as string;
+
+  if (!creatorId) {
+    return res.status(400).json({ error: 'creatorId is required' });
+  }
 
   if (!POWERNODE_STORAGE_CONNECTION) {
     return res.status(500).json({ error: 'Storage connection not configured' });

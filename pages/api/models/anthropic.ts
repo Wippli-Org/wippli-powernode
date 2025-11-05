@@ -15,74 +15,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'API key is required' });
   }
 
-  // Anthropic doesn't have a models list endpoint, so we return a curated list
-  // of current Claude models with their capabilities
-  const models = [
-    {
-      id: 'claude-sonnet-4-5-20250514',
-      name: 'Claude Sonnet 4.5 (Latest)',
-      description: 'Most capable model, best for complex tasks',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-sonnet-4-0-20250514',
-      name: 'Claude Sonnet 4.0',
-      description: 'Previous generation Sonnet',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-7-sonnet-20250219',
-      name: 'Claude 3.7 Sonnet',
-      description: 'Latest 3.7 Sonnet',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-5-sonnet-20241022',
-      name: 'Claude 3.5 Sonnet (Oct 2024)',
-      description: 'Balanced performance and speed',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-5-sonnet-20240620',
-      name: 'Claude 3.5 Sonnet (Jun 2024)',
-      description: 'Earlier version of 3.5 Sonnet',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-haiku-4-5-20250514',
-      name: 'Claude Haiku 4.5',
-      description: 'Fast and affordable',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-5-haiku-20241022',
-      name: 'Claude 3.5 Haiku (Oct 2024)',
-      description: 'Fast responses, lower cost',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-opus-20240229',
-      name: 'Claude 3 Opus',
-      description: 'Most powerful Claude 3 model',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-sonnet-20240229',
-      name: 'Claude 3 Sonnet',
-      description: 'Balanced Claude 3 model',
-      context: '200K tokens',
-    },
-    {
-      id: 'claude-3-haiku-20240307',
-      name: 'Claude 3 Haiku',
-      description: 'Fastest Claude 3 model',
-      context: '200K tokens',
-    },
-  ];
+  try {
+    // Fetch models dynamically from Anthropic API
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+    });
 
-  return res.status(200).json({
-    success: true,
-    models,
-    provider: 'anthropic',
-  });
+    if (!response.ok) {
+      throw new Error('Failed to fetch models from Anthropic API');
+    }
+
+    const data = await response.json();
+
+    const models = data.data.map((model: any) => ({
+      id: model.id,
+      name: model.display_name || model.id,
+      created: model.created_at,
+      type: model.type,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      models,
+      provider: 'anthropic',
+    });
+  } catch (error: any) {
+    console.error('Error fetching Anthropic models:', error);
+    return res.status(500).json({
+      error: error.message || 'Failed to fetch models',
+      fallback: [
+        { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+        { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
+        { id: 'claude-3-5-haiku-20241022', name: 'Claude Haiku 3.5' },
+        { id: 'claude-3-opus-20240229', name: 'Claude Opus 3' },
+      ],
+    });
+  }
 }
