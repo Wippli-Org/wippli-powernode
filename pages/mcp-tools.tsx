@@ -572,28 +572,28 @@ export default function MCPToolsPage() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-gray-50 flex items-center justify-center">
+      <div className="h-screen bg-grey-400 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading MCP servers...</p>
+          <p className="mt-4 text-light">Loading MCP servers...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-grey-400 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-200 bg-white">
+      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-grey-500 bg-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">MCP Tools Management</h1>
-            <p className="text-sm text-gray-600 mt-1">Manage and test Model Context Protocol servers and tools</p>
+            <h1 className="text-2xl font-bold text-header">MCP Tools Management</h1>
+            <p className="text-sm text-light mt-1">Manage and test Model Context Protocol servers and tools</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={exportConfig}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-sidebar border border-gray-300 text-neutral-700 rounded-lg hover:bg-grey-400 transition-colors text-sm"
             >
               <Download className="w-4 h-4" />
               Export Config
@@ -613,7 +613,7 @@ export default function MCPToolsPage() {
       <div className="flex-1 overflow-hidden">
         <div className="h-full grid grid-cols-12 gap-0">
           {/* MCP Servers List */}
-          <div className="col-span-5 h-full bg-white border-r border-gray-200 overflow-y-auto p-6">
+          <div className="col-span-5 h-full bg-sidebar border-r border-grey-500 overflow-y-auto p-6">
             <div className="space-y-4">
               {mcpServers.map((server) => (
                 <div
@@ -622,14 +622,14 @@ export default function MCPToolsPage() {
                   className={`border rounded-lg p-4 cursor-pointer transition-all ${
                     selectedServer?.id === server.id
                       ? 'border-primary bg-primary/5'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-grey-500 hover:border-gray-300'
                   }`}
                 >
                   {/* Server Header */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Server className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold text-gray-900">{server.name}</h3>
+                      <h3 className="font-semibold text-header">{server.name}</h3>
                     </div>
                     <div className="flex items-center gap-2">
                       {/* Edit and Delete buttons */}
@@ -638,14 +638,14 @@ export default function MCPToolsPage() {
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
                         title="Edit server"
                       >
-                        <Edit2 className="w-4 h-4 text-gray-600 hover:text-primary" />
+                        <Edit2 className="w-4 h-4 text-light hover:text-primary" />
                       </button>
                       <button
                         onClick={(e) => handleDeleteServer(server, e)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
                         title="Delete server"
                       >
-                        <Trash2 className="w-4 h-4 text-gray-600 hover:text-red-600" />
+                        <Trash2 className="w-4 h-4 text-light hover:text-red-600" />
                       </button>
 
                       {/* Status indicator */}
@@ -664,10 +664,10 @@ export default function MCPToolsPage() {
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-3">{server.description}</p>
+                  <p className="text-sm text-light mb-3">{server.description}</p>
 
                   {/* Server Stats */}
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-4 text-xs text-light">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       Latency: {server.latency}ms
@@ -679,19 +679,19 @@ export default function MCPToolsPage() {
                   </div>
 
                   {/* Tools List */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 pt-4 border-t border-grey-500">
                     <div className="flex items-center justify-between mb-2">
                       <button
                         onClick={(e) => toggleServerExpanded(server.id, e)}
-                        className="flex items-center gap-2 hover:bg-gray-50 rounded px-2 py-1 transition-colors flex-1 text-left"
+                        className="flex items-center gap-2 hover:bg-grey-400 rounded px-2 py-1 transition-colors flex-1 text-left"
                       >
-                        <h4 className="text-xs font-semibold text-gray-700">
+                        <h4 className="text-xs font-semibold text-neutral-700">
                           Available Tools ({server.tools?.length || 0})
                         </h4>
                         {expandedServers.has(server.id) ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                          <ChevronUp className="w-3.5 h-3.5 text-light" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                          <ChevronDown className="w-3.5 h-3.5 text-light" />
                         )}
                       </button>
                       <button
@@ -719,13 +719,13 @@ export default function MCPToolsPage() {
                           className={`p-2 rounded border cursor-pointer transition-colors ${
                             selectedTool?.name === tool.name && selectedServer?.id === server.id
                               ? 'border-primary bg-primary/5'
-                              : 'border-gray-100 hover:border-gray-200 bg-gray-50'
+                              : 'border-gray-100 hover:border-grey-500 bg-grey-400'
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{tool.name}</p>
-                              <p className="text-xs text-gray-500">{tool.description}</p>
+                              <p className="text-sm font-medium text-header truncate">{tool.name}</p>
+                              <p className="text-xs text-light">{tool.description}</p>
                             </div>
                             <span className="text-xs text-gray-400 ml-2">{tool.lastUsed || 'Never'}</span>
                           </div>
@@ -744,14 +744,14 @@ export default function MCPToolsPage() {
             <div className="max-w-3xl">
               <div className="flex items-center gap-2 mb-4">
                 <Zap className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold text-gray-900">Tool Tester</h2>
+                <h2 className="text-lg font-semibold text-header">Tool Tester</h2>
               </div>
 
               {selectedTool ? (
                 <div className="space-y-4">
                   {/* Tool Selector */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
                       Select Tool
                     </label>
                     <select
@@ -772,7 +772,7 @@ export default function MCPToolsPage() {
 
                   {/* Arguments Editor */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
                       Arguments (JSON)
                     </label>
                     <textarea
@@ -796,7 +796,7 @@ export default function MCPToolsPage() {
                   {/* Result */}
                   {testResult && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">
                         Result
                       </label>
                       <div className="w-full p-4 border border-gray-300 rounded-lg bg-gray-900 text-gray-100 font-mono text-sm overflow-auto max-h-96">
@@ -823,15 +823,15 @@ export default function MCPToolsPage() {
                             </div>
                           ));
                         }
-                        return <p className="text-sm text-gray-500">No schema information available</p>;
+                        return <p className="text-sm text-light">No schema information available</p>;
                       })()}
                     </div>
                   </div>
 
                   {/* Testing Tips */}
-                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Testing Tips</h3>
-                    <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                  <div className="mt-4 p-4 bg-grey-400 border border-grey-500 rounded-lg">
+                    <h3 className="text-sm font-semibold text-header mb-2">Testing Tips</h3>
+                    <ul className="text-sm text-light space-y-1 list-disc list-inside">
                       <li>Ensure JSON is valid before executing</li>
                       <li>Check schema for required parameters</li>
                       <li>File paths must be accessible</li>
@@ -840,7 +840,7 @@ export default function MCPToolsPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-64">
-                  <div className="text-center text-gray-500">
+                  <div className="text-center text-light">
                     <FileJson className="w-16 h-16 mx-auto mb-4 opacity-20" />
                     <p className="text-lg font-semibold">No tool selected</p>
                     <p className="text-sm mt-2">Select a tool from the left to test it</p>
@@ -857,10 +857,10 @@ export default function MCPToolsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add MCP Server</h3>
+              <h3 className="text-lg font-semibold text-header">Add MCP Server</h3>
               <button
                 onClick={() => setShowAddServer(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-light"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -868,7 +868,7 @@ export default function MCPToolsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Server Name *
                 </label>
                 <input
@@ -881,7 +881,7 @@ export default function MCPToolsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Description
                 </label>
                 <input
@@ -894,7 +894,7 @@ export default function MCPToolsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Server URL *
                 </label>
                 <input
@@ -907,7 +907,7 @@ export default function MCPToolsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   API Key (Optional)
                 </label>
                 <input
@@ -917,7 +917,7 @@ export default function MCPToolsPage() {
                   placeholder="Bearer token or API key for authentication"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">Leave blank if server doesn't require authentication</p>
+                <p className="text-xs text-light mt-1">Leave blank if server doesn't require authentication</p>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -934,7 +934,7 @@ export default function MCPToolsPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setShowAddServer(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-neutral-700 rounded-lg hover:bg-grey-400 transition-colors"
                 >
                   Cancel
                 </button>
@@ -955,10 +955,10 @@ export default function MCPToolsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit MCP Server</h3>
+              <h3 className="text-lg font-semibold text-header">Edit MCP Server</h3>
               <button
                 onClick={handleCancelEditServer}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-light"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -966,7 +966,7 @@ export default function MCPToolsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Server Name *
                 </label>
                 <input
@@ -979,7 +979,7 @@ export default function MCPToolsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Description
                 </label>
                 <input
@@ -992,7 +992,7 @@ export default function MCPToolsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Server URL *
                 </label>
                 <input
@@ -1005,7 +1005,7 @@ export default function MCPToolsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   API Key (Optional)
                 </label>
                 <input
@@ -1015,12 +1015,12 @@ export default function MCPToolsPage() {
                   placeholder="Bearer token or API key for authentication"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">Leave blank to keep existing API key</p>
+                <p className="text-xs text-light mt-1">Leave blank to keep existing API key</p>
               </div>
 
               {newServerUrl.includes('/mcp-server/n8n') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
                     n8n Server URL (Optional)
                   </label>
                   <input
@@ -1030,14 +1030,14 @@ export default function MCPToolsPage() {
                     placeholder="e.g., https://n8n.brannium.com/api/v1"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-light mt-1">
                     The actual n8n instance to connect to (overrides instance-level config)
                   </p>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Tools (JSON Array)
                 </label>
                 <textarea
@@ -1047,13 +1047,13 @@ export default function MCPToolsPage() {
                   rows={8}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">JSON array of tools available on this MCP server</p>
+                <p className="text-xs text-light mt-1">JSON array of tools available on this MCP server</p>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleCancelEditServer}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-neutral-700 rounded-lg hover:bg-grey-400 transition-colors"
                 >
                   Cancel
                 </button>
@@ -1074,12 +1074,12 @@ export default function MCPToolsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-header">
                 Add New Tool to {addingToolToServer.name}
               </h3>
               <button
                 onClick={handleCancelAddTool}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-light"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1087,7 +1087,7 @@ export default function MCPToolsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Tool Name *
                 </label>
                 <input
@@ -1097,11 +1097,11 @@ export default function MCPToolsPage() {
                   placeholder="e.g., get_node_code"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">Unique identifier for this tool (use snake_case)</p>
+                <p className="text-xs text-light mt-1">Unique identifier for this tool (use snake_case)</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Description *
                 </label>
                 <textarea
@@ -1111,11 +1111,11 @@ export default function MCPToolsPage() {
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">Clear description of what this tool does</p>
+                <p className="text-xs text-light mt-1">Clear description of what this tool does</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Input Schema (JSON) *
                 </label>
                 <textarea
@@ -1125,7 +1125,7 @@ export default function MCPToolsPage() {
                   rows={12}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">JSON schema defining the tool's input parameters</p>
+                <p className="text-xs text-light mt-1">JSON schema defining the tool's input parameters</p>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1149,7 +1149,7 @@ export default function MCPToolsPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleCancelAddTool}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-neutral-700 rounded-lg hover:bg-grey-400 transition-colors"
                 >
                   Cancel
                 </button>

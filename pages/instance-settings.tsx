@@ -119,11 +119,11 @@ export default function InstanceSettings() {
   const embedded = isEmbeddedMode();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-grey-400">
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-sm border border-grey-500 p-6 mb-6">
           <h1 className="text-2xl font-bold mb-2">Instance Settings</h1>
-          <p className="text-gray-600 mb-4">
+          <p className="text-light mb-4">
             Configure this PowerNode instance for independent operation or n8n embedding
           </p>
 
@@ -141,20 +141,20 @@ export default function InstanceSettings() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Instance ID
                 </label>
                 <input
                   type="text"
                   value={config.instanceId}
                   disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-grey-400 text-light"
                 />
-                <p className="text-xs text-gray-500 mt-1">Unique identifier for this instance</p>
+                <p className="text-xs text-light mt-1">Unique identifier for this instance</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Instance Name
                 </label>
                 <input
@@ -167,7 +167,7 @@ export default function InstanceSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Supplier ID
                 </label>
                 <input
@@ -177,7 +177,7 @@ export default function InstanceSettings() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="supplier-123"
                 />
-                <p className="text-xs text-gray-500 mt-1">Organization/supplier-level isolation for multi-tenant environments</p>
+                <p className="text-xs text-light mt-1">Organization/supplier-level isolation for multi-tenant environments</p>
               </div>
             </div>
           </div>
@@ -199,7 +199,7 @@ export default function InstanceSettings() {
                   }
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label className="ml-2 block text-sm text-gray-900">
+                <label className="ml-2 block text-sm text-header">
                   Enable n8n integration
                 </label>
               </div>
@@ -207,7 +207,7 @@ export default function InstanceSettings() {
               {config.n8n?.enabled && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
                       n8n API URL
                     </label>
                     <input
@@ -225,7 +225,7 @@ export default function InstanceSettings() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">
                       n8n API Key
                     </label>
                     <input
@@ -263,13 +263,13 @@ export default function InstanceSettings() {
                   }
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label className="ml-2 block text-sm text-gray-900">
+                <label className="ml-2 block text-sm text-header">
                   Hide navigation (for embedding)
                 </label>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
                   Enabled Pages (comma-separated)
                 </label>
                 <input
@@ -287,7 +287,7 @@ export default function InstanceSettings() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="workflows,mcp-tools,executions"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-light mt-1">
                   Leave empty to enable all pages
                 </p>
               </div>
@@ -298,7 +298,7 @@ export default function InstanceSettings() {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
             >
               {saved ? <Check className="w-4 h-4" /> : null}
               {saved ? 'Saved!' : 'Save Locally'}
@@ -315,7 +315,7 @@ export default function InstanceSettings() {
 
             <button
               onClick={handleCopyURL}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2"
+              className="px-4 py-2 bg-gray-100 text-neutral-700 rounded-md hover:bg-gray-200 flex items-center gap-2"
             >
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               {copied ? 'Copied!' : 'Copy Embed URL'}
@@ -323,13 +323,13 @@ export default function InstanceSettings() {
 
             <button
               onClick={handleExportJSON}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2"
+              className="px-4 py-2 bg-gray-100 text-neutral-700 rounded-md hover:bg-gray-200 flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
               Export JSON
             </button>
 
-            <label className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2 cursor-pointer">
+            <label className="px-4 py-2 bg-gray-100 text-neutral-700 rounded-md hover:bg-gray-200 flex items-center gap-2 cursor-pointer">
               <Upload className="w-4 h-4" />
               Import JSON
               <input
@@ -359,7 +359,7 @@ export default function InstanceSettings() {
             </h2>
 
             <div className="bg-white rounded-lg p-4 mb-4">
-              <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase">
+              <h3 className="text-sm font-bold text-header mb-2 uppercase">
                 Step 1: Copy This URL
               </h3>
               <div className="flex items-center gap-2">
@@ -380,10 +380,10 @@ export default function InstanceSettings() {
             </div>
 
             <div className="bg-white rounded-lg p-4">
-              <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase">
+              <h3 className="text-sm font-bold text-header mb-2 uppercase">
                 Step 2: Paste in n8n
               </h3>
-              <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
+              <ul className="text-sm text-neutral-700 space-y-2 list-disc list-inside">
                 <li>Open your n8n workflow</li>
                 <li>Add an <strong>HTTP Request</strong> node or browser/iframe node</li>
                 <li>Paste the URL above as the target</li>
@@ -397,24 +397,24 @@ export default function InstanceSettings() {
         )}
 
         {/* Usage Examples */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-grey-500 p-6">
           <h2 className="text-lg font-semibold mb-3">Usage Examples</h2>
 
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
+              <h3 className="text-sm font-medium text-neutral-700 mb-2">
                 Embed in n8n (URL Parameters)
               </h3>
-              <pre className="bg-gray-50 p-3 rounded text-xs overflow-x-auto">
+              <pre className="bg-grey-400 p-3 rounded text-xs overflow-x-auto">
                 {exportConfigAsURL(config)}
               </pre>
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
+              <h3 className="text-sm font-medium text-neutral-700 mb-2">
                 Embed in iframe (Hide Navigation)
               </h3>
-              <pre className="bg-gray-50 p-3 rounded text-xs overflow-x-auto">
+              <pre className="bg-grey-400 p-3 rounded text-xs overflow-x-auto">
 {`<iframe
   src="${window.location.origin}?instanceId=${config.instanceId}&hideNav=true"
   width="100%"
@@ -425,10 +425,10 @@ export default function InstanceSettings() {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
+              <h3 className="text-sm font-medium text-neutral-700 mb-2">
                 Multiple Instances with Different n8n Configs
               </h3>
-              <pre className="bg-gray-50 p-3 rounded text-xs overflow-x-auto">
+              <pre className="bg-grey-400 p-3 rounded text-xs overflow-x-auto">
 {`// Production Instance
 ${window.location.origin}?n8nApiUrl=https://prod.n8n.com/api/v1&n8nApiKey=prod_key
 

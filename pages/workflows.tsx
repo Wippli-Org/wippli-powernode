@@ -106,7 +106,7 @@ function InstructionNode({ data, mcpServers }: { data: any; mcpServers?: any[] }
         {/* MCP Badge if configured */}
         {mcpServer && (
           <div
-            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border-2 flex items-center justify-center text-xs font-bold shadow"
+            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-sidebar border-2 flex items-center justify-center text-xs font-bold shadow"
             style={{ borderColor: '#10b981' }}
             title={mcpServer.name}
           >
@@ -117,7 +117,7 @@ function InstructionNode({ data, mcpServers }: { data: any; mcpServers?: any[] }
 
       {/* Label below node */}
       <div className="absolute top-[68px] left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-        <div className="text-xs font-semibold text-gray-700 text-center">
+        <div className="text-xs font-semibold text-neutral-700 text-center">
           {data.label || typeInfo.label}
         </div>
       </div>
@@ -674,19 +674,19 @@ I will automatically apply this corrected configuration to the node.`;
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-grey-400 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-gray-200 bg-white">
+      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b border-grey-500 bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Workflow Builder</h1>
+              <h1 className="text-xl font-bold text-header">Workflow Builder</h1>
               {activeWorkflow && (
                 <input
                   type="text"
                   value={activeWorkflow.name}
                   onChange={(e) => updateWorkflowName(e.target.value)}
-                  className="text-sm text-gray-600 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded px-1 -ml-1"
+                  className="text-sm text-light bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-primary rounded px-1 -ml-1"
                 />
               )}
             </div>
@@ -695,7 +695,7 @@ I will automatically apply this corrected configuration to the node.`;
             <button
               onClick={copySelectedNodesToClipboard}
               disabled={nodes.filter(n => n.selected).length === 0}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-sidebar border border-gray-300 text-neutral-700 rounded-lg hover:bg-grey-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               title="Copy selected nodes as JSON"
             >
               {copied ? (
@@ -712,7 +712,7 @@ I will automatically apply this corrected configuration to the node.`;
             </button>
             <button
               onClick={createNewWorkflow}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-sidebar border border-gray-300 text-neutral-700 rounded-lg hover:bg-grey-400 transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
               New
@@ -742,9 +742,9 @@ I will automatically apply this corrected configuration to the node.`;
       <div className="flex-1 overflow-hidden">
         <div className="h-full grid grid-cols-12 gap-0">
           {/* Workflows Sidebar */}
-          <div className="col-span-2 h-full border-r border-gray-200 bg-white overflow-y-auto">
-            <div className="p-3 border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-700">Workflows</h2>
+          <div className="col-span-2 h-full border-r border-grey-500 bg-white overflow-y-auto">
+            <div className="p-3 border-b border-grey-500">
+              <h2 className="text-sm font-semibold text-neutral-700">Workflows</h2>
             </div>
             <div className="p-2">
               {workflows.map((workflow) => (
@@ -754,15 +754,15 @@ I will automatically apply this corrected configuration to the node.`;
                   className={`p-2 mb-2 rounded-lg border cursor-pointer transition-colors ${
                     activeWorkflow?.id === workflow.id
                       ? 'bg-primary/10 border-primary'
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                      : 'bg-sidebar border-grey-500 hover:bg-grey-400'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-900 truncate">
+                      <h3 className="text-sm font-semibold text-header truncate">
                         {workflow.name}
                       </h3>
-                      <p className="text-xs text-gray-500">{workflow.nodes.length} nodes</p>
+                      <p className="text-xs text-light">{workflow.nodes.length} nodes</p>
                     </div>
                     <button
                       onClick={(e) => {
@@ -780,14 +780,14 @@ I will automatically apply this corrected configuration to the node.`;
           </div>
 
           {/* Instruction Types Sidebar - Drag square icons */}
-          <div className="col-span-1 h-full border-r border-gray-200 bg-white overflow-y-auto">
-            <div className="p-3 border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-700 text-center">Icons</h2>
+          <div className="col-span-1 h-full border-r border-grey-500 bg-white overflow-y-auto">
+            <div className="p-3 border-b border-grey-500">
+              <h2 className="text-sm font-semibold text-neutral-700 text-center">Icons</h2>
             </div>
             <div className="p-3 space-y-4">
               {/* File Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">File Ops</h3>
+                <h3 className="text-xs font-semibold text-light uppercase mb-2 text-center">File Ops</h3>
                 <div className="flex flex-col items-center gap-3">
                   {(['read', 'write', 'edit', 'delete', 'search', 'save'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
@@ -806,7 +806,7 @@ I will automatically apply this corrected configuration to the node.`;
                         >
                           <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
+                        <div className="text-[10px] text-center mt-1 text-light font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -817,7 +817,7 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* AI Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">AI Ops</h3>
+                <h3 className="text-xs font-semibold text-light uppercase mb-2 text-center">AI Ops</h3>
                 <div className="flex flex-col items-center gap-3">
                   {(['transform', 'extract', 'analyse', 'translate'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
@@ -836,7 +836,7 @@ I will automatically apply this corrected configuration to the node.`;
                         >
                           <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
+                        <div className="text-[10px] text-center mt-1 text-light font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -847,7 +847,7 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* Code Operations */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">Code Ops</h3>
+                <h3 className="text-xs font-semibold text-light uppercase mb-2 text-center">Code Ops</h3>
                 <div className="flex flex-col items-center gap-3">
                   {(['code', 'execute', 'debug', 'fix', 'test'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
@@ -866,7 +866,7 @@ I will automatically apply this corrected configuration to the node.`;
                         >
                           <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
+                        <div className="text-[10px] text-center mt-1 text-light font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -877,7 +877,7 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* Flow Control */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">Flow</h3>
+                <h3 className="text-xs font-semibold text-light uppercase mb-2 text-center">Flow</h3>
                 <div className="flex flex-col items-center gap-3">
                   {(['decide', 'loop', 'wait'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
@@ -896,7 +896,7 @@ I will automatically apply this corrected configuration to the node.`;
                         >
                           <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
+                        <div className="text-[10px] text-center mt-1 text-light font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -907,7 +907,7 @@ I will automatically apply this corrected configuration to the node.`;
 
               {/* Integration */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2 text-center">Integration</h3>
+                <h3 className="text-xs font-semibold text-light uppercase mb-2 text-center">Integration</h3>
                 <div className="flex flex-col items-center gap-3">
                   {(['http', 'passTo', 'compare', 'correct'] as InstructionType[]).map((type) => {
                     const typeInfo = INSTRUCTION_TYPES[type];
@@ -926,7 +926,7 @@ I will automatically apply this corrected configuration to the node.`;
                         >
                           <Icon className="w-8 h-8" style={{ color: typeInfo.color }} />
                         </div>
-                        <div className="text-[10px] text-center mt-1 text-gray-600 font-medium">
+                        <div className="text-[10px] text-center mt-1 text-light font-medium">
                           {typeInfo.label}
                         </div>
                       </div>
@@ -938,7 +938,7 @@ I will automatically apply this corrected configuration to the node.`;
           </div>
 
           {/* Canvas */}
-          <div className="col-span-7 h-full bg-gray-50">
+          <div className="col-span-7 h-full bg-grey-400">
             {activeWorkflow ? (
               <ReactFlow
                 nodes={nodes}
@@ -960,7 +960,7 @@ I will automatically apply this corrected configuration to the node.`;
               </ReactFlow>
             ) : (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center text-gray-500">
+                <div className="text-center text-light">
                   <FileText className="w-16 h-16 mx-auto mb-4 opacity-20" />
                   <p className="text-lg font-semibold">No workflow selected</p>
                   <p className="text-sm mt-2">Create or select a workflow to get started</p>
@@ -970,12 +970,12 @@ I will automatically apply this corrected configuration to the node.`;
           </div>
 
           {/* Right Sidebar - Node Config or Execution Log */}
-          <div className="col-span-2 h-full bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+          <div className="col-span-2 h-full bg-sidebar border-l border-grey-500 flex flex-col overflow-hidden">
             {selectedNode ? (
               <>
-                <div className="p-3 border-b border-gray-200">
+                <div className="p-3 border-b border-grey-500">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-sm font-semibold text-gray-900">Node Config</h2>
+                    <h2 className="text-sm font-semibold text-header">Node Config</h2>
                     <button
                       onClick={() => deleteNode(selectedNode.id)}
                       className="p-1 text-red-600 hover:bg-red-50 rounded"
@@ -983,14 +983,14 @@ I will automatically apply this corrected configuration to the node.`;
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-light">
                     {INSTRUCTION_TYPES[selectedNode.data.type as InstructionType].description}
                   </p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3">
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-neutral-700 mb-1">
                         Label
                       </label>
                       <input
@@ -1012,7 +1012,7 @@ I will automatically apply this corrected configuration to the node.`;
 
                     {/* MCP Server Selection */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-neutral-700 mb-1">
                         MCP Server
                       </label>
                       <select
@@ -1036,14 +1036,14 @@ I will automatically apply this corrected configuration to the node.`;
                         ))}
                       </select>
                       {selectedNode.data.mcpServer && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-light mt-1">
                           {mcpServers.find((s: any) => s.id === selectedNode.data.mcpServer)?.description}
                         </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-neutral-700 mb-1">
                         Configuration (JSON)
                       </label>
                       <textarea
@@ -1065,7 +1065,7 @@ I will automatically apply this corrected configuration to the node.`;
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleTestNode(selectedNode)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
                       >
                         <TestTube className="w-4 h-4" />
                         Test
@@ -1081,7 +1081,7 @@ I will automatically apply this corrected configuration to the node.`;
 
                     {/* Logs Section */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-neutral-700 mb-1">
                         Logs
                       </label>
                       <div className="w-full h-32 px-2 py-2 text-xs border border-gray-300 rounded bg-gray-900 text-gray-100 font-mono overflow-y-auto">
@@ -1092,7 +1092,7 @@ I will automatically apply this corrected configuration to the node.`;
                             </div>
                           ))
                         ) : (
-                          <div className="text-gray-500 italic">No logs yet</div>
+                          <div className="text-light italic">No logs yet</div>
                         )}
                       </div>
                     </div>
@@ -1101,8 +1101,8 @@ I will automatically apply this corrected configuration to the node.`;
               </>
             ) : executionLog.length > 0 ? (
               <>
-                <div className="p-3 border-b border-gray-200">
-                  <h2 className="text-sm font-semibold text-gray-900">Execution Log</h2>
+                <div className="p-3 border-b border-grey-500">
+                  <h2 className="text-sm font-semibold text-header">Execution Log</h2>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 bg-gray-900 text-gray-100 font-mono text-xs">
                   {executionLog.map((log, idx) => (
@@ -1113,7 +1113,7 @@ I will automatically apply this corrected configuration to the node.`;
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500 p-4">
+              <div className="flex-1 flex items-center justify-center text-light p-4">
                 <div className="text-center">
                   <Settings className="w-12 h-12 mx-auto mb-3 opacity-20" />
                   <p className="text-sm">Click a node to configure it</p>

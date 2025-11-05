@@ -246,17 +246,17 @@ export default function StoragePage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-grey-400 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Storage Management</h1>
-          <p className="text-gray-600 mt-2">Manage files across Azure Blob, OneDrive, and Google Drive</p>
+          <h1 className="text-3xl font-bold text-header">Storage Management</h1>
+          <p className="text-light mt-2">Manage files across Azure Blob, OneDrive, and Google Drive</p>
         </div>
 
         {/* Storage Provider Tabs */}
         <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b border-gray-200">
+          <div className="border-b border-grey-500">
             <nav className="flex -mb-px">
               {(Object.keys(providers) as StorageType[]).map((type) => {
                 const provider = providers[type];
@@ -272,7 +272,7 @@ export default function StoragePage() {
                       isActive
                         ? 'border-primary text-primary bg-blue-50'
                         : provider.enabled
-                        ? 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-transparent text-light hover:text-neutral-700 hover:border-gray-300'
                         : 'border-transparent text-gray-300 cursor-not-allowed'
                     }`}
                   >
@@ -289,21 +289,21 @@ export default function StoragePage() {
 
           {/* Provider Stats */}
           {providers[activeTab].connected && (
-            <div className="p-4 bg-gray-50 border-b border-gray-200">
+            <div className="p-4 bg-grey-400 border-b border-grey-500">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-3 rounded-lg border border-gray-200">
-                  <p className="text-xs text-gray-600">Total Files</p>
-                  <p className="text-2xl font-bold text-gray-900">{providers[activeTab].fileCount || 0}</p>
+                <div className="bg-white p-3 rounded-lg border border-grey-500">
+                  <p className="text-xs text-light">Total Files</p>
+                  <p className="text-2xl font-bold text-header">{providers[activeTab].fileCount || 0}</p>
                 </div>
-                <div className="bg-white p-3 rounded-lg border border-gray-200">
-                  <p className="text-xs text-gray-600">Used Storage</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="bg-white p-3 rounded-lg border border-grey-500">
+                  <p className="text-xs text-light">Used Storage</p>
+                  <p className="text-2xl font-bold text-header">
                     {formatFileSize(providers[activeTab].usedSize || 0)}
                   </p>
                 </div>
-                <div className="bg-white p-3 rounded-lg border border-gray-200">
-                  <p className="text-xs text-gray-600">Total Storage</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="bg-white p-3 rounded-lg border border-grey-500">
+                  <p className="text-xs text-light">Total Storage</p>
+                  <p className="text-2xl font-bold text-header">
                     {providers[activeTab].totalSize ? formatFileSize(providers[activeTab].totalSize!) : 'Unlimited'}
                   </p>
                 </div>
@@ -328,7 +328,7 @@ export default function StoragePage() {
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-light"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -351,7 +351,7 @@ export default function StoragePage() {
               <button
                 onClick={loadFiles}
                 disabled={loading}
-                className="flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                className="flex items-center px-4 py-2 text-neutral-700 bg-sidebar border border-gray-300 rounded-lg hover:bg-grey-400 disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -408,45 +408,45 @@ export default function StoragePage() {
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
-              <p className="ml-3 text-gray-600">Loading files...</p>
+              <p className="ml-3 text-light">Loading files...</p>
             </div>
           ) : filteredFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <FolderOpen className="w-16 h-16 text-gray-300 mb-4" />
-              <p className="text-gray-600 font-medium">No files found</p>
-              <p className="text-gray-500 text-sm mt-1">
+              <p className="text-light font-medium">No files found</p>
+              <p className="text-light text-sm mt-1">
                 {searchTerm || filterType !== 'all' ? 'Try adjusting your filters' : 'Upload a file to get started'}
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-grey-400">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modified</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-light uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-light uppercase tracking-wider">Size</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-light uppercase tracking-wider">Modified</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-light uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredFiles.map((file, index) => {
                     const FileIcon = getFileIcon(file.name);
                     return (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                      <tr key={index} className="hover:bg-grey-400 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <FileIcon className="w-5 h-5 text-gray-400 mr-3" />
                             <div>
-                              <div className="text-sm font-medium text-gray-900">{file.name}</div>
-                              {file.path && <div className="text-xs text-gray-500">{file.path}</div>}
+                              <div className="text-sm font-medium text-header">{file.name}</div>
+                              {file.path && <div className="text-xs text-light">{file.path}</div>}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-light">
                           {formatFileSize(file.size)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-light">
                           {formatDate(file.lastModified)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -487,7 +487,7 @@ export default function StoragePage() {
 
         {/* File Count Summary */}
         {!loading && filteredFiles.length > 0 && (
-          <div className="mt-4 text-sm text-gray-600 text-center">
+          <div className="mt-4 text-sm text-light text-center">
             Showing {filteredFiles.length} of {files.length} files
           </div>
         )}

@@ -251,7 +251,7 @@ export default function ConfigPage() {
 
   const renderSecretInput = (label: string, value: string, onChange: (val: string) => void, key: string) => (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <label className="block caption2 text-header mb-2">{label}</label>
       <div className="relative">
         <input
           type={showSecrets[key] ? 'text' : 'password'}
@@ -281,16 +281,16 @@ export default function ConfigPage() {
     return (
       <div
         key={providerKey}
-        className={`bg-white rounded-lg shadow-sm border-2 transition-all ${
-          provider.enabled ? 'border-primary' : 'border-gray-200'
-        } p-6`}
+        className={`paper border-2 transition-brand ${
+          provider.enabled ? 'border-primary shadow-elevation' : 'border-grey-500'
+        }`}
       >
         {/* Header with toggle */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-gray-900">{info.name}</h3>
+            <h4 className="text-header">{info.name}</h4>
             {provider.enabled && (
-              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+              <span className="px-2 py-1 bg-success-light text-success-dark caption3 rounded">
                 ENABLED
               </span>
             )}
@@ -300,18 +300,18 @@ export default function ConfigPage() {
               href={info.getKeyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline flex items-center gap-1"
+              className="caption1 text-primary hover:text-accent transition-brand flex items-center gap-1"
             >
               Get API Key <ExternalLink className="w-3 h-3" />
             </a>
             <button
               onClick={() => updateProvider(providerKey, { enabled: !provider.enabled })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                provider.enabled ? 'bg-primary' : 'bg-gray-300'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-brand ${
+                provider.enabled ? 'bg-primary' : 'bg-grey-700'
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-brand ${
                   provider.enabled ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
@@ -333,7 +333,7 @@ export default function ConfigPage() {
             {providerKey === 'azureOpenAI' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Endpoint URL</label>
+                  <label className="block caption2 text-header mb-2">Endpoint URL</label>
                   <input
                     type="text"
                     value={(provider as any).endpoint || ''}
@@ -343,7 +343,7 @@ export default function ConfigPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Deployment Name</label>
+                  <label className="block caption2 text-header mb-2">Deployment Name</label>
                   <input
                     type="text"
                     value={(provider as any).deployment || ''}
@@ -359,7 +359,7 @@ export default function ConfigPage() {
             <button
               onClick={() => fetchProviderModels(providerKey)}
               disabled={!provider.apiKey || loadingModels[providerKey]}
-              className="w-full px-4 py-2 border border-primary text-primary rounded-lg font-medium hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="secondary__button w-full"
             >
               <RefreshCw className={`w-4 h-4 ${loadingModels[providerKey] ? 'animate-spin' : ''}`} />
               {loadingModels[providerKey] ? 'Fetching Models...' : 'Fetch Latest Models from API'}
@@ -377,7 +377,7 @@ export default function ConfigPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
                 placeholder="e.g., claude-sonnet-4-5, gpt-4o, gemini-2.5-pro"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="caption text-light mt-1">
                 Type or paste any model name from {info.name}
               </p>
             </div>
@@ -385,7 +385,7 @@ export default function ConfigPage() {
             {/* Model Selection Dropdown (if models fetched) */}
             {providerModels[providerKey] && providerModels[providerKey].length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block caption2 text-header mb-2">
                   Or select from fetched models ({providerModels[providerKey].length} available)
                 </label>
                 <select
@@ -422,42 +422,42 @@ export default function ConfigPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-grey-400">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">PowerNode Configuration</h1>
-          <p className="text-gray-600">
+          <h2 className="text-header mb-2">PowerNode Configuration</h2>
+          <p className="body1 text-light">
             Configure AI providers with your own API keys - enable the providers you want to use
           </p>
           {supplierId !== 'default-user' && (
-            <div className="mt-3 inline-flex items-center px-3 py-1 rounded-md bg-blue-50 border border-blue-200">
-              <span className="text-sm font-medium text-blue-800">Configuring for: {supplierId}</span>
+            <div className="mt-3 inline-flex items-center px-3 py-1 rounded-lg bg-blue-200 border border-blue-600">
+              <span className="caption2 text-primary">Configuring for: {supplierId}</span>
             </div>
           )}
         </div>
 
         {/* Status Messages */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="mb-6 toast error flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-red-800 mb-1">Error</h3>
-              <p className="text-sm text-red-700">{error}</p>
+              <h3 className="caption3 mb-1">Error</h3>
+              <p className="caption1">{error}</p>
             </div>
           </div>
         )}
 
         {saved && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-500" />
-            <p className="text-sm text-green-800 font-medium">Configuration saved successfully!</p>
+          <div className="mb-6 toast success flex items-center gap-3">
+            <CheckCircle className="w-5 h-5" />
+            <p className="caption2">Configuration saved successfully!</p>
           </div>
         )}
 
         {/* AI Providers Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">AI Providers</h2>
+          <h3 className="text-header mb-4">AI Providers</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {renderProviderCard('openai', providerInfo.openai)}
             {renderProviderCard('anthropic', providerInfo.anthropic)}
@@ -468,8 +468,8 @@ export default function ConfigPage() {
         </div>
 
         {/* Global Settings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Global AI Settings</h2>
+        <div className="paper mb-6">
+          <h4 className="text-header mb-4">Global AI Settings</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
@@ -482,7 +482,7 @@ export default function ConfigPage() {
                 onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
-              <p className="text-xs text-gray-500 mt-1">0 = deterministic, 2 = creative</p>
+              <p className="caption text-light mt-1">0 = deterministic, 2 = creative</p>
             </div>
 
             <div>
@@ -501,8 +501,8 @@ export default function ConfigPage() {
         </div>
 
         {/* Storage Configuration */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Storage Configuration</h2>
+        <div className="paper mb-6">
+          <h4 className="text-header mb-4">Storage Configuration</h2>
           <div className="grid grid-cols-1 gap-6">
             {renderSecretInput(
               'PowerNode Storage Connection String',
@@ -524,7 +524,7 @@ export default function ConfigPage() {
         </div>
 
         {/* OneDrive Configuration */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="paper mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-2">
@@ -545,8 +545,8 @@ export default function ConfigPage() {
         </div>
 
         {/* Custom System Prompts */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Custom System Prompts (Optional)</h2>
+        <div className="paper mb-6">
+          <h4 className="text-header mb-4">Custom System Prompts (Optional)</h2>
           <p className="text-sm text-gray-600 mb-6">
             Override the default system prompts for specific MCP tools. Leave empty to use defaults.
           </p>
@@ -560,7 +560,7 @@ export default function ConfigPage() {
               { key: 'postWippliComment', label: 'Post Wippli Comment' },
             ].map(({ key, label }) => (
               <div key={key}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+                <label className="block caption2 text-header mb-2">{label}</label>
                 <textarea
                   value={(config.customPrompts as any)[key] || ''}
                   onChange={(e) =>
@@ -579,7 +579,7 @@ export default function ConfigPage() {
         </div>
 
         {/* Test Chat */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="paper mb-6">
           <div className="flex items-center gap-2 mb-4">
             <MessageSquare className="w-6 h-6 text-primary" />
             <h2 className="text-xl font-semibold text-gray-900">Test Chat</h2>
@@ -652,7 +652,7 @@ export default function ConfigPage() {
           <button
             onClick={saveConfig}
             disabled={saving}
-            className="px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="primary__button"
           >
             {saving ? (
               <>

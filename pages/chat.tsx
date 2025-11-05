@@ -161,12 +161,12 @@ export default function ChatPage() {
 
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'INFO': return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'SUCCESS': return 'text-green-600 bg-green-50 border-green-200';
-      case 'WARN': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'ERROR': return 'text-red-600 bg-red-50 border-red-200';
-      case 'AI': return 'text-purple-600 bg-purple-50 border-purple-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'INFO': return 'text-primary bg-blue-200 border-blue-600';
+      case 'SUCCESS': return 'text-success-dark bg-success-light border-success';
+      case 'WARN': return 'text-warning bg-warning-light border-warning';
+      case 'ERROR': return 'text-error bg-red-50 border-error';
+      case 'AI': return 'text-purple-900 bg-purple-100 border-purple-600';
+      default: return 'text-neutral-600 bg-grey-400 border-grey-600';
     }
   };
 
@@ -299,16 +299,16 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-grey-400 flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-200 bg-white">
+      <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-grey-500 bg-white shadow-elevation">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">PowerNode Chat</h1>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-header">PowerNode Chat</h2>
+            <p className="caption1 text-light">
               {config ? (
                 <>
-                  <span className="font-mono font-semibold text-primary">
+                  <span className="font-mono caption2 text-primary">
                     {config.providers?.[config.defaultProvider]?.model || 'Not configured'}
                   </span>
                 </>
@@ -324,13 +324,13 @@ export default function ChatPage() {
       <div className="flex-1 overflow-hidden">
         <div className="h-full grid grid-cols-12 gap-0">
           {/* Conversations Sidebar */}
-          <div className="col-span-12 lg:col-span-3 h-full border-r border-gray-200 overflow-hidden">
-            <div className="bg-white h-full flex flex-col">
+          <div className="col-span-12 lg:col-span-3 h-full border-r border-grey-500 overflow-hidden">
+            <div className="bg-sidebar h-full flex flex-col">
               {/* Sidebar Header */}
-              <div className="p-4 border-b border-gray-200">
+              <div className="p-4 border-b border-grey-500 bg-sidebar-header">
                 <button
                   onClick={createNewConversation}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  className="primary__button w-full"
                 >
                   <Plus className="w-4 h-4" />
                   New Conversation
@@ -342,10 +342,10 @@ export default function ChatPage() {
                 {conversations.map((conv) => (
                   <div
                     key={conv.id}
-                    className={`group mb-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    className={`group mb-2 p-3 rounded-component border cursor-pointer transition-brand ${
                       conv.id === activeConversationId
-                        ? 'bg-primary/10 border-primary'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                        ? 'bg-bubbles border-primary shadow-elevation'
+                        : 'bg-white border-grey-600 hover:bg-grey-400'
                     }`}
                     onClick={() => switchConversation(conv.id)}
                   >
@@ -360,18 +360,18 @@ export default function ChatPage() {
                               if (e.key === 'Enter') saveConversationName();
                               if (e.key === 'Escape') cancelRename();
                             }}
-                            className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent"
+                            className="flex-1 px-2 py-1 caption1"
                             autoFocus
                           />
                           <button
                             onClick={saveConversationName}
-                            className="p-1 text-green-600 hover:bg-green-50 rounded"
+                            className="p-1 text-success hover:bg-success-light rounded"
                           >
                             <Check className="w-4 h-4" />
                           </button>
                           <button
                             onClick={cancelRename}
-                            className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                            className="p-1 text-neutral-600 hover:bg-grey-400 rounded"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -379,10 +379,10 @@ export default function ChatPage() {
                       ) : (
                         <>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            <h3 className="caption3 text-header truncate">
                               {conv.name}
                             </h3>
-                            <p className="text-xs text-gray-500">
+                            <p className="caption text-light">
                               {conv.messages.length} messages
                             </p>
                           </div>
@@ -392,7 +392,7 @@ export default function ChatPage() {
                                 e.stopPropagation();
                                 startRenameConversation(conv.id, conv.name);
                               }}
-                              className="p-1 text-gray-600 hover:bg-gray-200 rounded"
+                              className="p-1 text-neutral-600 hover:bg-grey-500 rounded"
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
@@ -401,7 +401,7 @@ export default function ChatPage() {
                                 e.stopPropagation();
                                 deleteConversation(conv.id);
                               }}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              className="p-1 text-error hover:bg-red-50 rounded"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -418,19 +418,19 @@ export default function ChatPage() {
           {/* Main Content Area */}
           <div className="col-span-12 lg:col-span-9 h-full grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden">
           {/* Chat Panel */}
-          <div className="bg-white border-r border-gray-200 flex flex-col h-full overflow-hidden">
+          <div className="bg-white border-r border-grey-500 flex flex-col h-full overflow-hidden">
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center gap-2">
+            <div className="p-4 border-b border-grey-500 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold text-gray-900">Conversation</h2>
+              <h6 className="text-header">Conversation</h6>
             </div>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 && (
-                <div className="text-center text-gray-500 mt-8">
+                <div className="text-center text-light mt-8">
                   <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                  <p>No messages yet. Start a conversation!</p>
+                  <p className="body1">No messages yet. Start a conversation!</p>
                 </div>
               )}
 
@@ -440,10 +440,10 @@ export default function ChatPage() {
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
+                    className={`max-w-[80%] rounded-component p-3 shadow-elevation ${
                       message.role === 'user'
                         ? 'bg-primary text-white'
-                        : 'bg-gray-100 text-gray-900'
+                        : 'bg-grey-400 text-neutral-800'
                     }`}
                   >
                     {message.role === 'assistant' ? (
@@ -471,9 +471,9 @@ export default function ChatPage() {
               )}
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                  <p className="text-sm text-red-700">{error}</p>
+                <div className="toast error flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p className="caption1">{error}</p>
                 </div>
               )}
 
@@ -481,21 +481,21 @@ export default function ChatPage() {
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-200">
+            <div className="p-4 border-t border-grey-500">
               <div className="flex gap-2">
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Type a message... (Shift+Enter for new line)"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                  className="flex-1 resize-none"
                   rows={2}
                   disabled={loading}
                 />
                 <button
                   onClick={sendMessage}
                   disabled={loading || !input.trim()}
-                  className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="primary__button middle"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -506,14 +506,14 @@ export default function ChatPage() {
           {/* Execution Logs Panel */}
           <div className="bg-white flex flex-col h-full overflow-hidden">
             {/* Logs Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-4 border-b border-grey-500 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Terminal className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold text-gray-900">Execution Logs</h2>
+                <h6 className="text-header">Execution Logs</h6>
               </div>
               <button
                 onClick={() => setShowLogs(!showLogs)}
-                className="text-sm text-gray-600 hover:text-gray-900"
+                className="caption1 text-neutral-600 hover:text-primary transition-brand"
               >
                 {showLogs ? 'Hide' : 'Show'}
               </button>
@@ -521,11 +521,11 @@ export default function ChatPage() {
 
             {/* Logs Content */}
             {showLogs && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs">
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono caption">
                 {messages.filter(m => m.logs && m.logs.length > 0).length === 0 && (
-                  <div className="text-center text-gray-500 mt-8">
+                  <div className="text-center text-light mt-8">
                     <Terminal className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                    <p className="font-sans">No logs yet. Send a message to see execution logs.</p>
+                    <p className="font-sans body1">No logs yet. Send a message to see execution logs.</p>
                   </div>
                 )}
 
@@ -537,18 +537,18 @@ export default function ChatPage() {
                     return (
                       <div
                         key={logId}
-                        className={`border rounded p-3 ${getLevelColor(log.level)}`}
+                        className={`border rounded-lg p-3 ${getLevelColor(log.level)}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-gray-500">{log.timestamp}</span>
-                            <span className="font-semibold">{log.level}</span>
-                            <span className="text-gray-700">{log.component}</span>
+                            <span className="text-neutral-600">{log.timestamp}</span>
+                            <span className="caption3">{log.level}</span>
+                            <span className="text-neutral-700">{log.component}</span>
                           </div>
                           {log.details && (
                             <button
                               onClick={() => toggleLogExpanded(logId)}
-                              className="flex-shrink-0"
+                              className="flex-shrink-0 text-neutral-600 hover:text-primary transition-brand"
                             >
                               {isExpanded ? (
                                 <ChevronDown className="w-4 h-4" />
@@ -558,10 +558,10 @@ export default function ChatPage() {
                             </button>
                           )}
                         </div>
-                        <p className="text-sm pl-0">{log.message}</p>
+                        <p className="caption1 pl-0">{log.message}</p>
 
                         {isExpanded && log.details && (
-                          <div className="mt-2 p-2 bg-black/5 rounded text-xs overflow-x-auto">
+                          <div className="mt-2 p-2 bg-black/5 rounded caption overflow-x-auto">
                             <pre>{JSON.stringify(log.details, null, 2)}</pre>
                           </div>
                         )}

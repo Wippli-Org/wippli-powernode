@@ -1,6 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ========================================
+   🧩 BRAND CSS VARIABLES (FOUNDATION)
+   ======================================== */
+
+:root {
+  /* Default to Client role */
+  --branding-primary: #6F78BC;
+  --branding-accent: #CB007B;
+  --branding-contrast: #6F78BC;
+  --branding-white: #fff;
+  --branding-bubbles: rgba(111, 120, 188, 0.15);
+  --branding-sidebar: rgba(255, 255, 255, 0.6);
+  --branding-sidebar-header: rgba(111, 120, 188, 0.5);
+  --branding-background: #6F78BC;
+  --branding-history-bar: rgba(255, 255, 255, 0.9);
+  --branding-placeholder: #AEADAE;
+
+  /* Text colors */
+  --branding-text: #555;
+  --branding-text-light: #777;
+  --branding-text-lighter: #929293;
+  --branding-text-header: #6F78BC;
+
+  /* Transitions */
+  --branding-transition: background-color 1s cubic-bezier(0.4, 0, 0.2, 1),
+                         box-shadow 1s cubic-bezier(0.4, 0, 0.2, 1),
+                         border 1s cubic-bezier(0.4, 0, 0.2, 1),
+                         color 1s cubic-bezier(0.4, 0, 0.2, 1),
+                         fill 1s cubic-bezier(0.4, 0, 0.2, 1),
+                         stroke 1s cubic-bezier(0.4, 0, 0.2, 1),
+                         border-color 1s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Purple palette */
+  --purple-900: #502E91;
+  --purple-800: #6A4DA2;
+  --purple-700: #8169B0;
+  --purple-600: #9B88C0;
+  --purple-500: #B9ABD3;
+  --purple-400: #CDC3E0;
+  --purple-300: #DCD5E9;
+  --purple-200: #E6E1EF;
+  --purple-100: #EEEBF4;
+
+  /* Blue palette */
+  --blue-900: #6F78BC;
+  --blue-800: #848BC6;
+  --blue-700: #989FCF;
+  --blue-600: #ADB2D9;
+  --blue-500: #C1C5E2;
+  --blue-400: #D6D8EC;
+  --blue-300: #E2E4F1;
+  --blue-200: #F1F2F9;
+
+  /* Magenta palette (Accent) */
+  --magenta-900: #A90267;
+  --magenta-800: #CB007B;
+  --magenta-700: #D2248E;
+  --magenta-600: #DA49A1;
+  --magenta-500: #E16DB4;
+  --magenta-400: #E992C6;
+  --magenta-300: #F0B6D9;
+  --magenta-200: #EDDCE6;
+  --magenta-hover: #E6008B;
+
+  /* Grey palette */
+  --grey-900: #7C858F;
+  --grey-800: #B3BAC5;
+  --grey-700: #C3C7CE;
+  --grey-600: #CFD2D9;
+  --grey-500: #DDE1E9;
+  --grey-400: #F5F7FA;
+
+  /* Basic/Neutral palette */
+  --neutral-900: #4D4D4D;
+  --neutral-800: #555;
+  --neutral-700: #616161;
+  --neutral-600: #777;
+  --neutral-500: #929293;
+  --neutral-400: #AEADAE;
+  --neutral-300: #C9C8C9;
+  --neutral-200: #E4E4E4;
+
+  /* Status colors */
+  --status-success: #8FD84A;
+  --status-success-light: #E2F3CF;
+  --status-success-dark: #5EA82D;
+  --status-error: #FA374A;
+  --status-error-alt: #F5185A;
+  --status-error-material: #F44336;
+  --status-warning: #FBD927;
+  --status-warning-alt: #CEDE00;
+  --status-warning-light: #EBF299;
+  --status-info: #FF7F2F;
+  --status-info-alt: #F47E25;
+
+  /* Radii */
+  --radius-component: 20px;
+  --radius-button: 25px;
+  --radius-dialog: 20px;
+  --radius-round: 100%;
+  --radius-toast: 120px;
+
+  /* Shadows */
+  --shadow-elevation: 1px 1px 6px rgba(13, 95, 197, 0.1);
+  --shadow-backdrop: rgba(28, 30, 34, 0.6);
+}
+
+/* Supplier role theme */
+[data-role="supplier"] {
+  --branding-primary: #502E91;
+  --branding-contrast: #502E91;
+  --branding-background: #502E91;
+  --branding-bubbles: rgba(80, 46, 145, 0.15);
+  --branding-sidebar-header: rgba(80, 46, 145, 0.5);
+  --branding-text-header: #502E91;
+}
+
+/* ========================================
+   ✍️ TYPOGRAPHY
+   ======================================== */
 
 * {
   box-sizing: border-box;
@@ -12,19 +135,356 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Source Sans Pro', sans-serif;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--branding-text);
+  background: var(--branding-white);
 }
 
-body {
-  color: #000;
-  background: #fff;
+h1, h2, h3, h4, h5, h6 {
+  color: var(--branding-text-header);
+  font-weight: 600;
 }
 
+h2 {
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+h6 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+/* Typography utilities */
+.body1 {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.body2 {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.caption {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.caption1 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.caption2 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.caption3 {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.caption4 {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.caption7 {
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+/* ========================================
+   🧱 BUTTONS
+   ======================================== */
+
+.primary__button {
+  min-width: 225px;
+  padding: 11px 18px;
+  border-radius: var(--radius-button);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: var(--branding-accent);
+  color: var(--branding-white);
+  border: none;
+  cursor: pointer;
+  transition: var(--branding-transition);
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.primary__button:hover {
+  background: var(--magenta-hover);
+  box-shadow: var(--shadow-elevation);
+}
+
+.primary__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primary__button.middle {
+  min-width: 132px;
+}
+
+.primary__button.color_clear {
+  background: var(--branding-white);
+  color: var(--branding-accent);
+  border: 2px solid var(--branding-accent);
+}
+
+.primary__button.color_clear:hover {
+  background: var(--branding-accent);
+  color: var(--branding-white);
+}
+
+.primary__button.tetriary {
+  background: var(--branding-white);
+  color: var(--branding-text);
+  border: 1px solid var(--grey-600);
+}
+
+.primary__button.tetriary:hover {
+  background: var(--grey-400);
+}
+
+.secondary__button {
+  min-width: 225px;
+  padding: 11px 18px;
+  border-radius: var(--radius-button);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: var(--branding-white);
+  color: var(--branding-accent);
+  border: 2px solid var(--branding-accent);
+  cursor: pointer;
+  transition: var(--branding-transition);
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.secondary__button:hover {
+  background: var(--magenta-hover);
+  color: var(--branding-white);
+  border-color: var(--magenta-hover);
+}
+
+.secondary__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary__button.middle {
+  min-width: 132px;
+}
+
+.button__medium {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--branding-contrast);
+}
+
+.button__big {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* ========================================
+   📦 COMPONENTS
+   ======================================== */
+
+/* Paper/Card component */
+.paper {
+  background: var(--branding-white);
+  border-radius: var(--radius-component);
+  box-shadow: var(--shadow-elevation);
+  padding: 20px;
+}
+
+/* Input fields */
 input, textarea, select {
-  color: #000 !important;
-  background-color: #fff !important;
+  color: var(--branding-text) !important;
+  background-color: var(--branding-white) !important;
+  border: 1px solid var(--grey-600);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: 'Source Sans Pro', sans-serif;
+  font-size: 15px;
+  transition: var(--branding-transition);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--branding-primary);
+  box-shadow: 0 0 0 3px var(--branding-bubbles);
 }
 
 input::placeholder, textarea::placeholder {
-  color: #666 !important;
+  color: var(--branding-placeholder) !important;
+}
+
+/* Toast notifications */
+.toast {
+  border-radius: var(--radius-toast);
+  padding: 12px 24px;
+  color: var(--branding-white);
+  font-weight: 600;
+  box-shadow: var(--shadow-elevation);
+}
+
+.toast.success {
+  background: var(--status-success);
+}
+
+.toast.error {
+  background: var(--status-error);
+}
+
+/* Dialog/Modal */
+.dialog {
+  background: var(--branding-white);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-elevation);
+  padding: 24px;
+}
+
+.dialog-backdrop {
+  background: var(--shadow-backdrop);
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding-right: 1%;
+  text-align: left;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--grey-500);
+}
+
+th {
+  font-weight: 600;
+  color: var(--branding-text-header);
+}
+
+/* ========================================
+   🎨 UTILITY CLASSES
+   ======================================== */
+
+.text-primary {
+  color: var(--branding-primary);
+}
+
+.text-accent {
+  color: var(--branding-accent);
+}
+
+.text-contrast {
+  color: var(--branding-contrast);
+}
+
+.text-header {
+  color: var(--branding-text-header);
+}
+
+.text-light {
+  color: var(--branding-text-light);
+}
+
+.text-lighter {
+  color: var(--branding-text-lighter);
+}
+
+.bg-primary {
+  background-color: var(--branding-primary);
+}
+
+.bg-accent {
+  background-color: var(--branding-accent);
+}
+
+.bg-bubbles {
+  background-color: var(--branding-bubbles);
+}
+
+.bg-sidebar {
+  background-color: var(--branding-sidebar);
+}
+
+.bg-sidebar-header {
+  background-color: var(--branding-sidebar-header);
+}
+
+.border-primary {
+  border-color: var(--branding-primary);
+}
+
+.border-accent {
+  border-color: var(--branding-accent);
+}
+
+/* Smooth transitions */
+.transition-brand {
+  transition: var(--branding-transition);
+}
+
+/* ========================================
+   📱 RESPONSIVE BREAKPOINTS
+   ======================================== */
+
+/* xs: 0px */
+/* sm: 375px */
+/* md: 1024px */
+/* lg: 1440px */
+/* xl: 1920px */
+
+@media (max-width: 375px) {
+  .primary__button,
+  .secondary__button {
+    min-width: auto;
+    padding: 10px 12px;
+  }
 }

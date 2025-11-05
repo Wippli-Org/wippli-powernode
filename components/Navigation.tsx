@@ -48,17 +48,27 @@ export default function Navigation() {
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <nav className="bg-white border-b border-grey-500 shadow-elevation transition-brand">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center px-2 text-gray-900 font-semibold text-lg">PowerNode</Link>
+            <Link href="/" className="flex items-center px-2 text-primary font-semibold text-lg hover:text-accent transition-brand">
+              PowerNode
+            </Link>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-1">
               {links.map((link) => {
                 const Icon = link.icon;
                 const isActive = router.pathname === link.href;
                 return (
-                  <Link key={link.href} href={link.href} className={`inline-flex items-center px-3 py-2 text-sm font-medium transition-colors border-b-2 ${isActive ? 'border-primary text-primary' : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'}`}>
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`inline-flex items-center px-3 py-2 caption2 transition-brand border-b-2 ${
+                      isActive
+                        ? 'border-accent text-accent'
+                        : 'border-transparent text-neutral-600 hover:text-primary hover:border-primary'
+                    }`}
+                  >
                     <Icon className="w-4 h-4 mr-1.5" />
                     {link.label}
                   </Link>
@@ -66,13 +76,13 @@ export default function Navigation() {
               })}
             </div>
           </div>
-          <div className="flex items-center text-sm text-gray-600">
+          <div className="flex items-center caption1 text-neutral-600">
             <Clock className="w-4 h-4 mr-2" />
             <span className="font-mono">{currentTime}</span>
-            <span className="mx-2 text-gray-400">|</span>
-            <span className="text-xs">{timezone}</span>
-            <span className="mx-2 text-gray-400">|</span>
-            <span className="text-xs font-medium">{modelName}</span>
+            <span className="mx-2 text-grey-700">|</span>
+            <span className="caption4">{timezone}</span>
+            <span className="mx-2 text-grey-700">|</span>
+            <span className="caption3 text-primary">{modelName}</span>
           </div>
         </div>
       </div>
@@ -82,7 +92,15 @@ export default function Navigation() {
             const Icon = link.icon;
             const isActive = router.pathname === link.href;
             return (
-              <Link key={link.href} href={link.href} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${isActive ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'}`}>
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex items-center px-3 py-2 body2 rounded-lg transition-brand ${
+                  isActive
+                    ? 'bg-accent text-white'
+                    : 'text-neutral-600 hover:bg-bubbles hover:text-primary'
+                }`}
+              >
                 <Icon className="w-5 h-5 mr-2" />
                 {link.label}
               </Link>

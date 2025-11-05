@@ -132,13 +132,13 @@ export default function Instances() {
   if (loading) return <div className="p-6">Loading instances...</div>;
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-grey-400">
       {/* Sidebar - Instance List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+      <div className="w-80 bg-sidebar border-r border-grey-500 flex flex-col">
+        <div className="p-4 border-b border-grey-500 bg-sidebar-header">
           <button
             onClick={handleNewInstance}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2"
+            className="primary__button w-full"
           >
             <Plus className="w-4 h-4" />
             New Instance
@@ -193,12 +193,12 @@ export default function Instances() {
         ) : (
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Instance Details */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Instance Configuration</h2>
+            <div className="paper">
+              <h4 className="text-header mb-4">Instance Configuration</h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block caption2 text-header mb-1">
                     Instance ID
                   </label>
                   <input
@@ -210,7 +210,7 @@ export default function Instances() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block caption2 text-header mb-1">
                     Instance Name
                   </label>
                   <input
@@ -223,7 +223,7 @@ export default function Instances() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block caption2 text-header mb-1">
                     Supplier ID
                   </label>
                   <input
@@ -240,7 +240,7 @@ export default function Instances() {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block caption2 text-header mb-1">
                         n8n API URL
                       </label>
                       <input
@@ -258,7 +258,7 @@ export default function Instances() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block caption2 text-header mb-1">
                         n8n API Key
                       </label>
                       <input
