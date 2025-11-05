@@ -7,7 +7,7 @@ export default function Navigation() {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState('');
   const [timezone, setTimezone] = useState('');
-  const [modelName, setModelName] = useState('Claude Sonnet 3.5');
+  const [modelName, setModelName] = useState('No model loaded');
 
   useEffect(() => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -22,7 +22,15 @@ export default function Navigation() {
     updateTime();
     const interval = setInterval(updateTime, 1000);
 
-    fetch('/api/config').then(res => res.json()).then(data => { if (data.anthropicModel) { setModelName(data.anthropicModel); } }).catch(() => {});
+    // Fetch config and determine which model is loaded
+    fetch('/api/config').then(res => res.json()).then(data => {
+      if (data.defaultProvider && data.providers) {
+        const provider = data.providers[data.defaultProvider];
+        if (provider && provider.enabled && provider.model) {
+          setModelName(provider.model);
+        }
+      }
+    }).catch(() => {});
 
     return () => clearInterval(interval);
   }, []);
