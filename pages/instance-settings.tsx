@@ -13,9 +13,11 @@ import { Copy, Check, Download, Upload, RefreshCw, Cloud } from 'lucide-react';
 export default function InstanceSettings() {
   const [config, setConfig] = useState<InstanceConfig | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedInstanceUrl, setCopiedInstanceUrl] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
   const [savingToCloud, setSavingToCloud] = useState(false);
+  const [hasBeenSavedToCloud, setHasBeenSavedToCloud] = useState(false);
 
   useEffect(() => {
     setConfig(getInstanceConfig());
@@ -36,6 +38,7 @@ export default function InstanceSettings() {
       const success = await saveInstanceToAPI(config);
       if (success) {
         setSavedToCloud(true);
+        setHasBeenSavedToCloud(true);
         setTimeout(() => setSavedToCloud(false), 2000);
       } else {
         alert('Failed to save instance to cloud. Check console for details.');
@@ -46,6 +49,14 @@ export default function InstanceSettings() {
     } finally {
       setSavingToCloud(false);
     }
+  };
+
+  const handleCopyInstanceUrl = () => {
+    if (!config) return;
+    const url = `https://powernode.wippli.ai?instanceId=${config.instanceId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedInstanceUrl(true);
+    setTimeout(() => setCopiedInstanceUrl(false), 2000);
   };
 
   const handleCopyURL = () => {
@@ -327,6 +338,52 @@ export default function InstanceSettings() {
             </button>
           </div>
         </div>
+
+        {/* HOW TO USE - Prominently displayed after save */}
+        {hasBeenSavedToCloud && (
+          <div className="bg-green-50 border-2 border-green-500 rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-bold text-green-900 mb-4 flex items-center gap-2">
+              <Check className="w-6 h-6" />
+              Instance Saved! Ready to Use in n8n
+            </h2>
+
+            <div className="bg-white rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase">
+                Step 1: Copy This URL
+              </h3>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={`https://powernode.wippli.ai?instanceId=${config.instanceId}`}
+                  readOnly
+                  className="flex-1 px-3 py-2 border-2 border-green-500 rounded-md bg-green-50 font-mono text-sm"
+                />
+                <button
+                  onClick={handleCopyInstanceUrl}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 whitespace-nowrap"
+                >
+                  {copiedInstanceUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedInstanceUrl ? 'Copied!' : 'Copy URL'}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase">
+                Step 2: Paste in n8n
+              </h3>
+              <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
+                <li>Open your n8n workflow</li>
+                <li>Add an <strong>HTTP Request</strong> node or browser/iframe node</li>
+                <li>Paste the URL above as the target</li>
+                <li>PowerNode will automatically load your saved configuration!</li>
+              </ul>
+              <p className="text-xs text-green-700 mt-3 bg-green-100 p-2 rounded">
+                Your n8n API credentials are securely stored in Azure - no need to pass them in the URL!
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Usage Examples */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
