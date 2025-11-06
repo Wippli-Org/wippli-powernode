@@ -229,6 +229,39 @@ async function getFolder(folderPath: string, userId?: string) {
   };
 }
 
+async function listFolderContents(folderPath: string, userId?: string) {
+  const { accessToken } = await getOneDriveConfig(userId);
+
+  // Normalize path - remove leading/trailing slashes
+  const normalizedPath = folderPath.replace(/^\/+|\/+$/g, '');
+
+  const encodedPath = encodeURIComponent(normalizedPath);
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodedPath}:/children`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to list folder contents: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const items = data.value.map((item: any) => ({
+    id: item.id,
+    name: item.name,
+    type: item.folder ? 'folder' : 'file',
+    size: item.size,
+    modifiedAt: item.lastModifiedDateTime,
+    webUrl: item.webUrl,
+  }));
+
+  return { items };
+}
+
 // MCP Protocol Handler
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -349,6 +382,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 required: ['folderPath'],
               },
             },
+            {
+              name: 'list_folder_contents',
+              description: 'List all files and folders within a folder. Returns names, IDs, types, sizes, and modification dates.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  folderPath: {
+                    type: 'string',
+                    description: 'The folder path (e.g., "Wippli_Master_Microsoft/Wippli_Consulting/Wippli_ProLogistiks")',
+                  },
+                },
+                required: ['folderPath'],
+              },
+            },
           ],
         };
         break;
@@ -375,6 +422,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             break;
           case 'get_folder':
             result = await getFolder(args.folderPath, userId);
+            break;
+          case 'list_folder_contents':
+            result = await listFolderContents(args.folderPath, userId);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
