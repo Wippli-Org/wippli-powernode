@@ -198,6 +198,37 @@ async function getDownloadUrl(fileId: string, userId?: string) {
   };
 }
 
+async function getFolder(folderPath: string, userId?: string) {
+  const { accessToken } = await getOneDriveConfig(userId);
+
+  // Normalize path - remove leading/trailing slashes
+  const normalizedPath = folderPath.replace(/^\/+|\/+$/g, '');
+
+  const encodedPath = encodeURIComponent(normalizedPath);
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/me/drive/root:/${encodedPath}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get folder: ${response.statusText}`);
+  }
+
+  const folderInfo = await response.json();
+  return {
+    id: folderInfo.id,
+    name: folderInfo.name,
+    path: folderInfo.parentReference?.path + '/' + folderInfo.name,
+    webUrl: folderInfo.webUrl,
+    createdDateTime: folderInfo.createdDateTime,
+    lastModifiedDateTime: folderInfo.lastModifiedDateTime,
+  };
+}
+
 // MCP Protocol Handler
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -304,6 +335,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 required: ['fileId'],
               },
             },
+            {
+              name: 'get_folder',
+              description: 'Get folder metadata including folder ID by providing a folder path. Returns folder ID, name, path, and URLs.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  folderPath: {
+                    type: 'string',
+                    description: 'The folder path (e.g., "Wippli_Master_Microsoft/Wippli_Consulting/Wippli_ProLogistiks/proLogistik_Wippli_Tasks")',
+                  },
+                },
+                required: ['folderPath'],
+              },
+            },
           ],
         };
         break;
@@ -327,6 +372,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             break;
           case 'download_url':
             result = await getDownloadUrl(args.fileId, userId);
+            break;
+          case 'get_folder':
+            result = await getFolder(args.folderPath, userId);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
