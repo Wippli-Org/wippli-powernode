@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>9:16 Book Page Flip</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #8B7355 0%, #D2B48C 50%, #8B7355 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .book-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .book-container {
+            width: 360px;
+            height: 640px;
+            position: relative;
+            perspective: 1500px;
+            transform-style: preserve-3d;
+        }
+
+        .book {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .book:active {
+            cursor: grabbing;
+        }
+
+        .page {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            border-radius: 8px;
+            box-shadow:
+                0 5px 30px rgba(0, 0, 0, 0.4),
+                inset 0 0 20px rgba(255, 255, 255, 0.1);
+            transform-origin: left center;
+            backfaceVisibility: hidden;
+            overflow: hidden;
+            border: 2px solid rgba(139, 115, 85, 0.3);
+        }
+
+        .page::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(0, 0, 0, 0.05) 5%,
+                transparent 10%
+            );
+            pointer-events: none;
+        }
+
+        .page-left {
+            left: 0;
+            z-index: 2;
+        }
+
+        .page-right {
+            left: 0;
+            opacity: 0.4;
+            z-index: 1;
+        }
+
+        .page-flipping {
+            left: 0;
+            z-index: 3;
+        }
+
+        .page-content {
+            padding: 50px 40px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            position: relative;
+        }
+
+        .emoji {
+            font-size: 80px;
+            margin-bottom: 30px;
+            margin-top: 40px;
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.2));
+        }
+
+        .title {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2c1810;
+            margin-bottom: 30px;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+            font-family: 'Georgia', serif;
+        }
+
+        .text {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #4a3425;
+            margin-bottom: 20px;
+            text-align: justify;
+            font-family: 'Georgia', serif;
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 30px;
+            font-size: 16px;
+            color: #8B7355;
+            font-style: italic;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 30px;
+            border-radius: 50px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .button {
+            padding: 12px 28px;
+            fontSize: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #8B7355 0%, #A0826D 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-indicator {
+            font-size: 18px;
+            font-weight: bold;
+            color: #5a4332;
+            min-width: 60px;
+        }
+
+        .hint {
+            color: white;
+            fontSize: 14px;
+            opacity: 0.9;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes flipForward {
+            0% {
+                transform: perspective(1500px) rotateY(0deg);
+                filter: brightness(1);
+            }
+            50% {
+                transform: perspective(1500px) rotateY(-90deg);
+                box-shadow: -30px 0 60px rgba(0, 0, 0, 0.5);
+                filter: brightness(0.7);
+            }
+            100% {
+                transform: perspective(1500px) rotateY(-180deg);
+                filter: brightness(1);
+            }
+        }
+
+        @keyframes flipBackward {
+            0% {
+                transform: perspective(1500px) rotateY(-180deg);
+                filter: brightness(1);
+            }
+            50% {
+                transform: perspective(1500px) rotateY(-90deg);
+                box-shadow: -30px 0 60px rgba(0, 0, 0, 0.5);
+                filter: brightness(0.7);
+            }
+            100% {
+                transform: perspective(1500px) rotateY(0deg);
+                filter: brightness(1);
+            }
+        }
+
+        .flip-forward {
+            animation: flipForward 0.8s cubic-bezier(0.645, 0.045, 0.355, 1.000);
+        }
+
+        .flip-backward {
+            animation: flipBackward 0.8s cubic-bezier(0.645, 0.045, 0.355, 1.000);
+        }
+
+        @media (max-width: 480px) {
+            .book-container {
+                width: 300px;
+                height: 533px;
+            }
+
+            .title {
+                font-size: 26px;
+            }
+
+            .text {
+                font-size: 16px;
+            }
+
+            .emoji {
+                font-size: 64px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="book-wrapper">
+        <div class="book-container">
+            <div class="book" id="book">
+                <!-- Pages will be dynamically rendered here -->
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="button" id="prevBtn">← Previous</button>
+            <span class="page-indicator" id="pageIndicator">1 / 5</span>
+            <button class="button" id="nextBtn">Next →</button>
+        </div>
+
+        <div class="hint">
+            💡 Swipe or drag to flip pages
+        </div>
+    </div>
+
+    <script>
+        const pages = [
+            {
+                id: 1,
+                title: "Welcome to Our Story",
+                content: "Once upon a time, in a land of wonder and magic, there lived a curious explorer who dreamed of distant horizons...",
+                bgColor: "#FFF8DC",
+                image: "🌅"
+            },
+            {
+                id: 2,
+                title: "Chapter One",
+                content: "The journey began on a bright morning. The sun painted the sky with golden hues as our hero set forth on an adventure of a lifetime.",
+                bgColor: "#FFE4B5",
+                image: "🗺️"
+            },
+            {
+                id: 3,
+                title: "Chapter Two",
+                content: "Through forests deep and mountains high, the path wound ever onward. Each step revealed new mysteries to discover and challenges to overcome.",
+                bgColor: "#E0FFE0",
+                image: "🏔️"
+            },
+            {
+                id: 4,
+                title: "Chapter Three",
+                content: "At last, the destination came into view. The journey had changed everything, and wisdom was gained along the way through trials and triumphs.",
+                bgColor: "#E6E6FA",
+                image: "⭐"
+            },
+            {
+                id: 5,
+                title: "The End",
+                content: "And so our tale concludes, but remember: every ending is just a new beginning waiting to unfold. The adventure continues...",
+                bgColor: "#FFE4E1",
+                image: "📖"
+            }
+        ];
+
+        let currentPage = 0;
+        let isFlipping = false;
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        const bookElement = document.getElementById('book');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const pageIndicator = document.getElementById('pageIndicator');
+
+        function createPageElement(pageData, className, zIndex) {
+            const pageDiv = document.createElement('div');
+            pageDiv.className = `page ${className}`;
+            pageDiv.style.backgroundColor = pageData.bgColor;
+            pageDiv.style.zIndex = zIndex;
+
+            pageDiv.innerHTML = `
+                <div class="page-content">
+                    <div class="emoji">${pageData.image}</div>
+                    <h2 class="title">${pageData.title}</h2>
+                    <p class="text">${pageData.content}</p>
+                    <div class="page-number">Page ${pageData.id}</div>
+                </div>
+            `;
+
+            return pageDiv;
+        }
+
+        function renderPages() {
+            bookElement.innerHTML = '';
+
+            // Current page (left side)
+            const currentPageElement = createPageElement(pages[currentPage], 'page-left', 2);
+            bookElement.appendChild(currentPageElement);
+
+            // Next page preview (right side)
+            if (currentPage < pages.length - 1) {
+                const nextPageElement = createPageElement(pages[currentPage + 1], 'page-right', 1);
+                bookElement.appendChild(nextPageElement);
+            }
+
+            updateControls();
+        }
+
+        function updateControls() {
+            prevBtn.disabled = currentPage === 0 || isFlipping;
+            nextBtn.disabled = currentPage === pages.length - 1 || isFlipping;
+            pageIndicator.textContent = `${currentPage + 1} / ${pages.length}`;
+        }
+
+        function flipToNextPage() {
+            if (isFlipping || currentPage >= pages.length - 1) return;
+
+            isFlipping = true;
+
+            const flippingPage = createPageElement(pages[currentPage], 'page-flipping flip-forward', 3);
+            bookElement.appendChild(flippingPage);
+
+            setTimeout(() => {
+                currentPage++;
+                isFlipping = false;
+                renderPages();
+            }, 800);
+        }
+
+        function flipToPreviousPage() {
+            if (isFlipping || currentPage <= 0) return;
+
+            isFlipping = true;
+
+            const flippingPage = createPageElement(pages[currentPage], 'page-flipping flip-backward', 3);
+            bookElement.appendChild(flippingPage);
+
+            setTimeout(() => {
+                currentPage--;
+                isFlipping = false;
+                renderPages();
+            }, 800);
+        }
+
+        // Touch events
+        bookElement.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        bookElement.addEventListener('touchmove', (e) => {
+            touchEndX = e.touches[0].clientX;
+        });
+
+        bookElement.addEventListener('touchend', () => {
+            const swipeDistance = touchStartX - touchEndX;
+            const minSwipeDistance = 50;
+
+            if (Math.abs(swipeDistance) > minSwipeDistance && !isFlipping) {
+                if (swipeDistance > 0 && currentPage < pages.length - 1) {
+                    flipToNextPage();
+                } else if (swipeDistance < 0 && currentPage > 0) {
+                    flipToPreviousPage();
+                }
+            }
+        });
+
+        // Mouse events
+        let mouseStartX = 0;
+        let mouseEndX = 0;
+        let isDragging = false;
+
+        bookElement.addEventListener('mousedown', (e) => {
+            mouseStartX = e.clientX;
+            isDragging = true;
+        });
+
+        bookElement.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                mouseEndX = e.clientX;
+            }
+        });
+
+        bookElement.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+
+            const swipeDistance = mouseStartX - mouseEndX;
+            const minSwipeDistance = 50;
+
+            if (Math.abs(swipeDistance) > minSwipeDistance && !isFlipping) {
+                if (swipeDistance > 0 && currentPage < pages.length - 1) {
+                    flipToNextPage();
+                } else if (swipeDistance < 0 && currentPage > 0) {
+                    flipToPreviousPage();
+                }
+            }
+
+            isDragging = false;
+            mouseStartX = 0;
+            mouseEndX = 0;
+        });
+
+        bookElement.addEventListener('mouseleave', () => {
+            isDragging = false;
+            mouseStartX = 0;
+            mouseEndX = 0;
+        });
+
+        // Button events
+        prevBtn.addEventListener('click', flipToPreviousPage);
+        nextBtn.addEventListener('click', flipToNextPage);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                flipToPreviousPage();
+            } else if (e.key === 'ArrowRight') {
+                flipToNextPage();
+            }
+        });
+
+        // Initialize
+        renderPages();
+    </script>
+</body>
+</html>
