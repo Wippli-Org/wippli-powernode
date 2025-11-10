@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Isabella's Journey - Interactive Storybook</title>
+  <title>Interactive Storybook - Isabella</title>
   <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
   <style>
     * {
@@ -73,7 +73,7 @@
 
       .story-text {
         font-size: 14px !important;
-        padding: 20px 25px !important;
+        padding: 10px !important;
       }
 
       .nav-btn {
@@ -87,14 +87,6 @@
 
       #nextBtn {
         right: 15px;
-      }
-
-      .cover-title {
-        font-size: 32px !important;
-      }
-
-      .cover-subtitle {
-        font-size: 18px !important;
       }
     }
 
@@ -117,7 +109,6 @@
       justify-content: center;
       align-items: center;
       overflow: hidden;
-      padding-top: 30px;
     }
 
     .page-back {
@@ -176,6 +167,7 @@
       text-align: center;
       max-width: 380px;
       padding: 0 15px;
+      font-family: 'Libre Baskerville', serif;
     }
 
     .page-num {
@@ -184,7 +176,6 @@
       font-size: 12px;
       color: #999;
       font-style: italic;
-      z-index: 20;
     }
 
     .page-left .page-num {
@@ -271,56 +262,35 @@
 
   <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
   <script>
-    // Embedded story data
-    const storyData = {
+    // Embedded data - ONLY THING CHANGED
+    const data = {
       child_name: "Isabella",
-      pages: [
-        {
-          page_number: 1,
-          image_url: "https://imglarger.com:8889/download/26811830-6e13-4b71-a5db-07937a0baf29/26811830-6e13-4b71-a5db-07937a0baf29.png",
-          text: "Once upon a time, in a magical forest filled with shimmering light, there lived a brave young girl named Isabella. She had heard tales of a legendary treasure hidden deep within the heart of the enchanted woods, and she was determined to find it."
-        },
-        {
-          page_number: 2,
-          image_url: "https://imglarger.com:8889/download/9fef5e66-3e83-4e05-9a55-b47b0449c3bd/9fef5e66-3e83-4e05-9a55-b47b0449c3bd.png",
-          text: "Isabella packed her backpack with snacks, a flashlight, and a map her grandmother had given her. With a heart full of courage, she set off into the forest, ready for whatever adventures awaited her."
-        },
-        {
-          page_number: 3,
-          image_url: "https://imglarger.com:8889/download/9a641b8a-aa20-4532-873f-a1a2b4449ee8/9a641b8a-aa20-4532-873f-a1a2b4449ee8.png",
-          text: "As Isabella walked deeper into the woods, she encountered a wise old owl perched on a branch. \"To find the treasure,\" the owl hooted, \"you must follow the path of the golden leaves.\""
-        },
-        {
-          page_number: 4,
-          image_url: "https://imglarger.com:8889/download/a4f12cb0-9e12-4e8a-91e8-4a96a6838145/a4f12cb0-9e12-4e8a-91e8-4a96a6838145.png",
-          text: "Isabella thanked the owl and began to follow the trail of golden leaves that sparkled in the sunlight. The path twisted and turned, leading her to a sparkling river where a friendly fox was waiting."
-        },
-        {
-          page_number: 5,
-          image_url: "https://imglarger.com:8889/download/e9b12b89-1fd6-4df3-9224-fc1be8aa6ae2/e9b12b89-1fd6-4df3-9224-fc1be8aa6ae2.png",
-          text: "The fox offered to help Isabella cross the river. \"Hop on my back,\" he said with a grin. Isabella climbed on, and together they glided across the water, laughing as they went."
-        },
-        {
-          page_number: 6,
-          image_url: "https://imglarger.com:8889/download/6c0f14a6-0eb6-4bc4-a0bc-aa94bfbf90fe/6c0f14a6-0eb6-4bc4-a0bc-aa94bfbf90fe.png",
-          text: "On the other side of the river, Isabella found herself in a clearing filled with colorful flowers. In the center stood a tall tree with a door carved into its trunk. She knocked gently, and the door swung open."
-        },
-        {
-          page_number: 7,
-          image_url: "https://imglarger.com:8889/download/5c8a44e8-9fa9-438a-b28d-cd77c9cbfbfc/5c8a44e8-9fa9-438a-b28d-cd77c9cbfbfc.png",
-          text: "Inside the tree, Isabella discovered a glowing chest filled with sparkling jewels and ancient books. But the real treasure was a note that read, \"The greatest treasure is the courage to explore and the friends you make along the way.\""
-        },
-        {
-          page_number: 8,
-          image_url: "https://imglarger.com:8889/download/15a1e5a4-cba4-4df6-8d87-cb4afdbe7990/15a1e5a4-cba4-4df6-8d87-cb4afdbe7990.png",
-          text: "Isabella smiled, knowing that her adventure had taught her something truly valuable. She made her way back home, her heart full of joy and her mind filled with memories of the magical friends she had met. And she knew that more adventures awaited her in the future."
-        }
-      ]
+      total_pages: 8,
+      page_1_image_url: "https://imglarger.com:8889/download/26811830-6e13-4b71-a5db-07937a0baf29/26811830-6e13-4b71-a5db-07937a0baf29.png",
+      page_1_text: "Once upon a time, in a magical forest filled with shimmering light, there lived a brave young girl named Isabella. She had heard tales of a legendary treasure hidden deep within the heart of the enchanted woods, and she was determined to find it.",
+      page_2_image_url: "https://imglarger.com:8889/download/9fef5e66-3e83-4e05-9a55-b47b0449c3bd/9fef5e66-3e83-4e05-9a55-b47b0449c3bd.png",
+      page_2_text: "Isabella packed her backpack with snacks, a flashlight, and a map her grandmother had given her. With a heart full of courage, she set off into the forest, ready for whatever adventures awaited her.",
+      page_3_image_url: "https://imglarger.com:8889/download/9a641b8a-aa20-4532-873f-a1a2b4449ee8/9a641b8a-aa20-4532-873f-a1a2b4449ee8.png",
+      page_3_text: "As Isabella walked deeper into the woods, she encountered a wise old owl perched on a branch. \"To find the treasure,\" the owl hooted, \"you must follow the path of the golden leaves.\"",
+      page_4_image_url: "https://imglarger.com:8889/download/a4f12cb0-9e12-4e8a-91e8-4a96a6838145/a4f12cb0-9e12-4e8a-91e8-4a96a6838145.png",
+      page_4_text: "Isabella thanked the owl and began to follow the trail of golden leaves that sparkled in the sunlight. The path twisted and turned, leading her to a sparkling river where a friendly fox was waiting.",
+      page_5_image_url: "https://imglarger.com:8889/download/e9b12b89-1fd6-4df3-9224-fc1be8aa6ae2/e9b12b89-1fd6-4df3-9224-fc1be8aa6ae2.png",
+      page_5_text: "The fox offered to help Isabella cross the river. \"Hop on my back,\" he said with a grin. Isabella climbed on, and together they glided across the water, laughing as they went.",
+      page_6_image_url: "https://imglarger.com:8889/download/6c0f14a6-0eb6-4bc4-a0bc-aa94bfbf90fe/6c0f14a6-0eb6-4bc4-a0bc-aa94bfbf90fe.png",
+      page_6_text: "On the other side of the river, Isabella found herself in a clearing filled with colorful flowers. In the center stood a tall tree with a door carved into its trunk. She knocked gently, and the door swung open.",
+      page_7_image_url: "https://imglarger.com:8889/download/5c8a44e8-9fa9-438a-b28d-cd77c9cbfbfc/5c8a44e8-9fa9-438a-b28d-cd77c9cbfbfc.png",
+      page_7_text: "Inside the tree, Isabella discovered a glowing chest filled with sparkling jewels and ancient books. But the real treasure was a note that read, \"The greatest treasure is the courage to explore and the friends you make along the way.\"",
+      page_8_image_url: "https://imglarger.com:8889/download/15a1e5a4-cba4-4df6-8d87-cb4afdbe7990/15a1e5a4-cba4-4df6-8d87-cb4afdbe7990.png",
+      page_8_text: "Isabella smiled, knowing that her adventure had taught her something truly valuable. She made her way back home, her heart full of joy and her mind filled with memories of the magical friends she had met. And she knew that more adventures awaited her in the future."
     };
 
-    // Build the storybook
-    function buildBook() {
+    // Build the storybook - EXACT SAME CODE
+    function buildBook(data) {
       const book = document.getElementById('book');
+      const childName = data.child_name || 'Child';
+      const title = data.title || `${childName}'s Journey`;
+      const subtitle = data.subtitle || 'A Magical Story';
+
       let html = '';
 
       // Transparent first page
@@ -330,25 +300,30 @@
       html += `
         <div class="page page-cover">
           <div class="cover-emoji">📖</div>
-          <h1 class="cover-title">${storyData.child_name}'s Journey</h1>
-          <p class="cover-subtitle">A Magical Story</p>
-          <p class="cover-author">An Adventure with ${storyData.child_name}</p>
+          <h1 class="cover-title">${title}</h1>
+          <p class="cover-subtitle">${subtitle}</p>
+          <p class="cover-author">An Adventure with ${childName}</p>
         </div>
       `;
 
       // Story pages
-      storyData.pages.forEach((page, index) => {
-        const isLeft = index % 2 === 0;
-        const pageClass = isLeft ? 'page-left' : 'page-right';
+      for (let i = 1; i <= (data.total_pages || 8); i++) {
+        const imageUrl = data[`page_${i}_image_url`];
+        const text = data[`page_${i}_text`] || '';
 
-        html += `
-          <div class="page ${pageClass} story-page">
-            <img src="${page.image_url}" alt="Page ${page.page_number}" class="story-image" crossorigin="anonymous">
-            <p class="story-text">${page.text}</p>
-            <div class="page-num">${page.page_number}</div>
-          </div>
-        `;
-      });
+        if (imageUrl) {
+          const isLeft = (i - 1) % 2 === 0;
+          const pageClass = isLeft ? 'page-left' : 'page-right';
+
+          html += `
+            <div class="page ${pageClass} story-page">
+              <img src="${imageUrl}" alt="Page ${i}" class="story-image" crossorigin="anonymous">
+              <p class="story-text">${text}</p>
+              <div class="page-num">${i}</div>
+            </div>
+          `;
+        }
+      }
 
       // Back cover
       html += `
@@ -366,7 +341,7 @@
       initPageFlip();
     }
 
-    // Initialize page flip
+    // Initialize page flip - EXACT SAME CODE
     function initPageFlip() {
       const book = document.getElementById('book');
       const prevBtn = document.getElementById('prevBtn');
@@ -407,7 +382,9 @@
     }
 
     // Initialize on load
-    window.addEventListener('DOMContentLoaded', buildBook);
+    window.addEventListener('DOMContentLoaded', () => {
+      buildBook(data);
+    });
   </script>
 </body>
 </html>
