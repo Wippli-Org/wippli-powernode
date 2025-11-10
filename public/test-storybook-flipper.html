@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Storybook Flipper</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      padding: 15px 30px;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      margin: 10px 0;
+      display: block;
+      width: 100%;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    h1 {
+      color: #333;
+    }
+    .info {
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    code {
+      background: #e0e0e0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 Test Storybook Flipper</h1>
+
+  <div class="info">
+    <h3>How to use:</h3>
+    <p>Click one of the buttons below to test the storybook with different data loading methods.</p>
+  </div>
+
+  <button onclick="testWithWindowObject()">Test with Window Object</button>
+  <button onclick="testWithURL()">Test with URL Parameter</button>
+  <button onclick="testWithLocalStorage()">Test with LocalStorage</button>
+
+  <div class="info">
+    <h3>For n8n Integration:</h3>
+    <p>In your n8n workflow, set <code>window.STORYBOOK_DATA</code> before loading the storybook:</p>
+    <pre style="background: #fff; padding: 10px; overflow-x: auto;">
+window.STORYBOOK_DATA = {
+  child_name: "Isabella",
+  valueToLearn: "Respect",
+  page_0_text: "Isabella's Journey",
+  page_0_image_url: "https://...",
+  page_1_image_url: "https://...",
+  page_1_text: "Story text here...",
+  // ... up to page_8
+};
+    </pre>
+  </div>
+
+  <script>
+    // Sample Isabella data
+    const isabellaData = {
+      child_name: "Isabella",
+      valueToLearn: "Respect",
+      value_to_learn: "Respect",
+      total_pages: 8,
+      page_0_text: "Isabella's Journey",
+      page_0_image_url: "https://tempfile.aiquickdraw.com/s/621a1dc7a736e71219ba8e7d16d06817_0_1762775503_1278.png",
+      page_1_image_url: "https://tempfile.aiquickdraw.com/s/36752ad4806fa4541dedf9aa710181b4_0_1762775476_5760.png",
+      page_1_text: "Isabella was a happy girl who loved playing with her friends. Every day at school, she had wonderful adventures with her classmates. But Isabella was about to discover something very special—the power of respect. Respect means valuing others and treating them kindly, no matter what.",
+      page_2_image_url: "https://tempfile.aiquickdraw.com/s/b91c8ad39eb7b31fab05c05ffe149cb7_0_1762775486_4253.png",
+      page_2_text: "One morning, Isabella's best friend Maya came to school looking worried. \"I brought my favorite art project to show everyone,\" Maya said softly. \"But I'm nervous people won't like it.\" Isabella listened carefully to her friend. She wanted to help Maya feel better and more confident about sharing her beautiful creation.",
+      page_3_image_url: "https://tempfile.aiquickdraw.com/s/0aeb22a9220df086f2154eb0df34011f_0_1762775473_9516.png",
+      page_3_text: "Isabella took Maya's hand gently. \"Your art is beautiful, and I respect how hard you worked on it,\" Isabella said warmly. \"Let me help you share it with our class. When we respect others and believe in them, they feel brave.\" Isabella showed Maya that respect means valuing someone's effort and feelings. It means listening and encouraging them with kindness and honesty.",
+      page_4_image_url: "https://tempfile.aiquickdraw.com/s/027f6182e7891a47c9f0a96ea244bab9_0_1762775481_9803.png",
+      page_4_text: "The next day at recess, Isabella saw another classmate, Tommy, sitting alone. Some of the bigger kids were being unkind, laughing at his new glasses. Isabella felt sad seeing Tommy hurt. She knew this was a moment to show real respect—standing up for someone who needed kindness and support.",
+      page_5_image_url: "https://tempfile.aiquickdraw.com/s/c91c228a3b2ee3883e39b2079d06c0ed_0_1762775487_2575.png",
+      page_5_text: "Isabella walked over to Tommy and sat beside him. \"I think your glasses look cool,\" she said with a genuine smile. \"And I respect you for being brave and trying something new. The other kids don't understand that yet, but I do.\" More friends noticed what Isabella was doing. Soon, five children gathered around Tommy, and he wasn't alone anymore. Respect creates courage in others.",
+      page_6_image_url: "https://tempfile.aiquickdraw.com/s/e03c1b7d0f7a2b8910e8f7ade18dc789_0_1762775480_5263.png",
+      page_6_text: "Isabella started to understand something magical about respect. When she truly valued others—listening to their feelings, believing in their talents, and standing up for what's right—something wonderful happened. People felt safe and loved around her. Her teacher, Ms. Chen, noticed Isabella's kind heart and brought her to the art studio for a special surprise.",
+      page_7_image_url: "https://tempfile.aiquickdraw.com/s/6aac5fb4095f8cce2ae057bacd398718_0_1762775482_6053.png",
+      page_7_text: "In the studio, Isabella's friends—Maya, Tommy, and her friend Sofia—had created an amazing group artwork. It was filled with colors and symbols of respect, friendship, and kindness. \"Isabella, this is for you,\" Maya said, beaming. \"You taught us all what respect really means. You saw the best in each of us and made us brave.\" Isabella's heart felt so full and happy seeing how her respect had helped everyone grow together.",
+      page_8_image_url: "https://tempfile.aiquickdraw.com/s/6b87ff6fb16ef68e2a20c66604455e65_0_1762775483_3295.png",
+      page_8_text: "Isabella had learned that respect is one of the most powerful gifts she could give. When she respected others—their feelings, their talents, their differences—it made the whole world brighter and kinder. Isabella's happy heart grew even bigger knowing that respect wasn't just something she did, it was something she lived. And everyone around her felt loved, valued, and brave. Isabella's journey had just begun, and respect would guide her forever."
+    };
+
+    function testWithWindowObject() {
+      window.STORYBOOK_DATA = isabellaData;
+      window.open('storybook-flipper.html', '_blank');
+    }
+
+    function testWithURL() {
+      const encodedData = encodeURIComponent(JSON.stringify(isabellaData));
+      window.open(`storybook-flipper.html?data=${encodedData}`, '_blank');
+    }
+
+    function testWithLocalStorage() {
+      localStorage.setItem('storybook_data', JSON.stringify(isabellaData));
+      window.open('storybook-flipper.html', '_blank');
+      alert('Data saved to localStorage. Opening storybook...');
+    }
+  </script>
+</body>
+</html>
