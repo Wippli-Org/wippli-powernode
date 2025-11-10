@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Isabella's Journey of Respect</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .container {
+      max-width: 100%;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 0;
+      padding: 30px;
+      position: relative;
+    }
+
+    #book-wrapper {
+      width: 100%;
+      max-width: 970px;
+      height: calc(100vh - 60px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: visible;
+    }
+
+    #book {
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+      background: transparent;
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 15px;
+      }
+
+      #book-wrapper {
+        height: calc(100vh - 30px);
+      }
+
+      #book {
+        max-height: 100%;
+      }
+
+      .navigation {
+        gap: 10px;
+      }
+
+      #prevBtn {
+        left: 15px;
+      }
+
+      #nextBtn {
+        right: 15px;
+      }
+
+      .nav-btn {
+        padding: 12px 10px;
+        font-size: 16px;
+      }
+
+      .story-text {
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+      }
+
+      .story-image {
+        max-height: 55% !important;
+      }
+    }
+
+    .page {
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      position: relative;
+    }
+
+    .page-cover {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .page-back {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      color: white;
+    }
+
+    .cover-emoji {
+      font-size: 100px;
+      margin-bottom: 30px;
+    }
+
+    .cover-title {
+      font-size: 42px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      line-height: 1.2;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cover-subtitle {
+      font-size: 20px;
+      font-style: italic;
+      margin-bottom: 40px;
+      opacity: 0.9;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cover-author {
+      font-size: 16px;
+      font-style: italic;
+      opacity: 0.8;
+      position: relative;
+      z-index: 1;
+    }
+
+    .story-page {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      padding: 30px;
+      gap: 20px;
+    }
+
+    .story-image {
+      width: 100%;
+      max-width: 380px;
+      max-height: 60%;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .story-text {
+      font-size: 18px;
+      line-height: 1.8;
+      color: #333;
+      text-align: center;
+      max-width: 400px;
+      padding: 0 10px;
+      font-family: 'Georgia', serif;
+    }
+
+    .page-num {
+      position: absolute;
+      bottom: 20px;
+      font-size: 12px;
+      color: #999;
+      font-style: italic;
+    }
+
+    .page-left .page-num {
+      left: 20px;
+    }
+
+    .page-right .page-num {
+      right: 20px;
+    }
+
+    .page-left {
+      border-right: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .page-left::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 8%;
+      bottom: 8%;
+      width: 2px;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent);
+      border-radius: 1px;
+    }
+
+    .navigation {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 16px 12px;
+      font-size: 19px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #667eea;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s;
+      font-family: 'Georgia', serif;
+      pointer-events: auto;
+    }
+
+    #prevBtn {
+      left: 30px;
+    }
+
+    #nextBtn {
+      right: 30px;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="book-wrapper">
+      <div id="book">
+        <!-- Transparent first page -->
+        <div class="page" style="background: transparent;"></div>
+
+        <!-- Cover page -->
+        <div class="page page-cover">
+          <div class="cover-emoji">📖</div>
+          <h1 class="cover-title">Isabella's Journey<br>of Respect</h1>
+          <p class="cover-subtitle">A Magical Story of Kindness</p>
+          <p class="cover-author">An Adventure in Learning</p>
+        </div>
+
+        <!-- Page 1: Morning - Waking up -->
+        <div class="page page-left story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/ff9f13b3d2514a5b01cd5b7fce06b421_0_1762758791_2512.png" alt="Isabella waking up" class="story-image">
+          <p class="story-text">Isabella woke up one beautiful morning, stretching her arms happily. Today felt special, like a new adventure was waiting just for her!</p>
+          <div class="page-num">1</div>
+        </div>
+
+        <!-- Page 2: Classroom - Greeting teacher -->
+        <div class="page page-right story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/e94fc72ad36a160046259be1832aea6e_0_1762758797_7230.png" alt="Isabella greeting teacher" class="story-image">
+          <p class="story-text">At school, Isabella greeted her teacher with a bright smile and a respectful "Good morning!" Her teacher's warm response made her heart glow.</p>
+          <div class="page-num">2</div>
+        </div>
+
+        <!-- Page 3: Art Studio - Watching friend -->
+        <div class="page page-left story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/805e7d820ac5c2362789fd4b7bea9d24_0_1762758800_6557.png" alt="Isabella watching friend paint" class="story-image">
+          <p class="story-text">In the art studio, Isabella watched her friend paint. She waited patiently, respecting her friend's creative space and concentration.</p>
+          <div class="page-num">3</div>
+        </div>
+
+        <!-- Page 4: Kitchen - After spill -->
+        <div class="page page-right story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/6e6f45e3ed72a8895a4ea96a1c92e963_0_1762758793_1816.png" alt="Isabella after spill" class="story-image">
+          <p class="story-text">When Isabella accidentally spilled her juice, she paused and took a deep breath. Instead of getting upset, she calmly cleaned it up.</p>
+          <div class="page-num">4</div>
+        </div>
+
+        <!-- Page 5: Library - Speaking kindly -->
+        <div class="page page-left story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/aa0ae04c2414450d3b9485825853eb4b_0_1762758795_9975.png" alt="Isabella speaking kindly" class="story-image">
+          <p class="story-text">In the library, Isabella noticed a classmate who looked worried. She spoke gently: "It's okay, accidents happen. Let me help you."</p>
+          <div class="page-num">5</div>
+        </div>
+
+        <!-- Page 6: Garden - Nature discovery -->
+        <div class="page page-right story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/2bf0f79bfcc5d1412da85ee27eb8b91a_0_1762758793_9522.png" alt="Isabella in garden" class="story-image">
+          <p class="story-text">In the garden, Isabella discovered that respect means caring for all living things. Tiny magical stars danced around her hands as she gently touched the flowers.</p>
+          <div class="page-num">6</div>
+        </div>
+
+        <!-- Page 7: Reading corner - Celebration -->
+        <div class="page page-left story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/92dd477734b0662a44452f5d811c5133_0_1762759102_2036.png" alt="Isabella celebrating" class="story-image">
+          <p class="story-text">As the sun set, Isabella reflected on her day. A glowing butterfly landed on her book, as if celebrating her journey of learning about respect.</p>
+          <div class="page-num">7</div>
+        </div>
+
+        <!-- Page 8: Forest - Spreading respect -->
+        <div class="page page-right story-page">
+          <img src="https://tempfile.aiquickdraw.com/s/e6dab7f77b757f9ab3de1806cb0dbc44_0_1762758825_9906.png" alt="Isabella in forest" class="story-image">
+          <p class="story-text">Now Isabella shares respect wherever she goes. Like the magical leaves swirling around her, kindness and respect spread to everyone she meets!</p>
+          <div class="page-num">8</div>
+        </div>
+
+        <!-- Back cover -->
+        <div class="page page-back">
+          <div class="cover-emoji">✨</div>
+          <h2 class="cover-title">The End</h2>
+          <p class="cover-subtitle">May you spread respect and kindness everywhere you go!</p>
+        </div>
+
+        <!-- Transparent last page -->
+        <div class="page" style="background: transparent;"></div>
+      </div>
+    </div>
+
+    <div class="navigation">
+      <button class="nav-btn" id="prevBtn">← Previous</button>
+      <button class="nav-btn" id="nextBtn">Next →</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+  <script>
+    const book = document.getElementById('book');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    const pageFlip = new St.PageFlip(book, {
+      width: 485,
+      height: 685,
+      size: 'fixed',
+      maxShadowOpacity: 0.5,
+      showCover: false,
+      mobileScrollSupport: false,
+      drawShadow: true,
+      flippingTime: 800,
+      usePortrait: true,
+      startPage: 1,
+      startZIndex: 0,
+      autoSize: false,
+      clickEventForward: true
+    });
+
+    pageFlip.loadFromHTML(document.querySelectorAll('#book .page'));
+
+    function updateNavigation() {
+      const currentPage = pageFlip.getCurrentPageIndex();
+      const totalPages = pageFlip.getPageCount();
+
+      prevBtn.disabled = currentPage === 0;
+      nextBtn.disabled = currentPage >= totalPages - 1;
+    }
+
+    pageFlip.on('flip', (e) => {
+      updateNavigation();
+    });
+
+    pageFlip.on('changeState', (e) => {
+      updateNavigation();
+    });
+
+    prevBtn.addEventListener('click', () => {
+      pageFlip.flipPrev();
+    });
+
+    nextBtn.addEventListener('click', () => {
+      pageFlip.flipNext();
+    });
+
+    updateNavigation();
+  </script>
+</body>
+</html>
