@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Isabella's Journey - Interactive Storybook</title>
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .container {
+      max-width: 100%;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 0;
+      padding: 30px;
+      position: relative;
+    }
+
+    #book-wrapper {
+      width: 100%;
+      max-width: 970px;
+      height: calc(100vh - 60px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: visible;
+    }
+
+    #book {
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+      background: transparent;
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 15px;
+      }
+
+      #book-wrapper {
+        height: calc(100vh - 30px);
+      }
+
+      .story-image {
+        max-height: 50% !important;
+      }
+
+      .story-text {
+        font-size: 14px !important;
+        padding: 20px 25px !important;
+      }
+
+      .nav-btn {
+        padding: 12px 10px;
+        font-size: 16px;
+      }
+
+      #prevBtn {
+        left: 15px;
+      }
+
+      #nextBtn {
+        right: 15px;
+      }
+
+      .cover-title {
+        font-size: 32px !important;
+      }
+
+      .cover-subtitle {
+        font-size: 18px !important;
+      }
+    }
+
+    .page {
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      position: relative;
+    }
+
+    .page-cover {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      padding-top: 30px;
+    }
+
+    .page-back {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      color: white;
+    }
+
+    .cover-emoji {
+      font-size: 100px;
+      margin-bottom: 30px;
+    }
+
+    .cover-title {
+      font-size: 42px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      line-height: 1.2;
+    }
+
+    .cover-subtitle {
+      font-size: 20px;
+      font-style: italic;
+      margin-bottom: 40px;
+      opacity: 0.9;
+    }
+
+    .cover-author {
+      font-size: 16px;
+      font-style: italic;
+      opacity: 0.8;
+    }
+
+    .story-page {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      padding: 0;
+      gap: 0;
+      position: relative;
+    }
+
+    .story-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .story-text {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      font-size: 16px;
+      line-height: 1.7;
+      color: #333;
+      text-align: center;
+      padding: 30px 35px;
+      background: rgba(255, 255, 255, 0.2);
+      font-family: 'Libre Baskerville', serif;
+      z-index: 10;
+    }
+
+    .page-num {
+      position: absolute;
+      bottom: 20px;
+      font-size: 12px;
+      color: #999;
+      font-style: italic;
+      z-index: 20;
+    }
+
+    .page-left .page-num {
+      left: 20px;
+    }
+
+    .page-right .page-num {
+      right: 20px;
+    }
+
+    .page-left {
+      border-right: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .page-left::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 8%;
+      bottom: 8%;
+      width: 2px;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent);
+      border-radius: 1px;
+    }
+
+    .navigation {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 16px 12px;
+      font-size: 19px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #667eea;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s;
+      font-family: 'Georgia', serif;
+      pointer-events: auto;
+    }
+
+    #prevBtn {
+      left: 30px;
+    }
+
+    #nextBtn {
+      right: 30px;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="book-wrapper">
+      <div id="book"></div>
+    </div>
+
+    <div class="navigation">
+      <button class="nav-btn" id="prevBtn">← Previous</button>
+      <button class="nav-btn" id="nextBtn">Next →</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+  <script>
+    // Embedded story data
+    const storyData = {
+      child_name: "Isabella",
+      pages: [
+        {
+          page_number: 1,
+          image_url: "https://imglarger.com:8889/download/26811830-6e13-4b71-a5db-07937a0baf29/26811830-6e13-4b71-a5db-07937a0baf29.png",
+          text: "Once upon a time, in a magical forest filled with shimmering light, there lived a brave young girl named Isabella. She had heard tales of a legendary treasure hidden deep within the heart of the enchanted woods, and she was determined to find it."
+        },
+        {
+          page_number: 2,
+          image_url: "https://imglarger.com:8889/download/9fef5e66-3e83-4e05-9a55-b47b0449c3bd/9fef5e66-3e83-4e05-9a55-b47b0449c3bd.png",
+          text: "Isabella packed her backpack with snacks, a flashlight, and a map her grandmother had given her. With a heart full of courage, she set off into the forest, ready for whatever adventures awaited her."
+        },
+        {
+          page_number: 3,
+          image_url: "https://imglarger.com:8889/download/9a641b8a-aa20-4532-873f-a1a2b4449ee8/9a641b8a-aa20-4532-873f-a1a2b4449ee8.png",
+          text: "As Isabella walked deeper into the woods, she encountered a wise old owl perched on a branch. \"To find the treasure,\" the owl hooted, \"you must follow the path of the golden leaves.\""
+        },
+        {
+          page_number: 4,
+          image_url: "https://imglarger.com:8889/download/a4f12cb0-9e12-4e8a-91e8-4a96a6838145/a4f12cb0-9e12-4e8a-91e8-4a96a6838145.png",
+          text: "Isabella thanked the owl and began to follow the trail of golden leaves that sparkled in the sunlight. The path twisted and turned, leading her to a sparkling river where a friendly fox was waiting."
+        },
+        {
+          page_number: 5,
+          image_url: "https://imglarger.com:8889/download/e9b12b89-1fd6-4df3-9224-fc1be8aa6ae2/e9b12b89-1fd6-4df3-9224-fc1be8aa6ae2.png",
+          text: "The fox offered to help Isabella cross the river. \"Hop on my back,\" he said with a grin. Isabella climbed on, and together they glided across the water, laughing as they went."
+        },
+        {
+          page_number: 6,
+          image_url: "https://imglarger.com:8889/download/6c0f14a6-0eb6-4bc4-a0bc-aa94bfbf90fe/6c0f14a6-0eb6-4bc4-a0bc-aa94bfbf90fe.png",
+          text: "On the other side of the river, Isabella found herself in a clearing filled with colorful flowers. In the center stood a tall tree with a door carved into its trunk. She knocked gently, and the door swung open."
+        },
+        {
+          page_number: 7,
+          image_url: "https://imglarger.com:8889/download/5c8a44e8-9fa9-438a-b28d-cd77c9cbfbfc/5c8a44e8-9fa9-438a-b28d-cd77c9cbfbfc.png",
+          text: "Inside the tree, Isabella discovered a glowing chest filled with sparkling jewels and ancient books. But the real treasure was a note that read, \"The greatest treasure is the courage to explore and the friends you make along the way.\""
+        },
+        {
+          page_number: 8,
+          image_url: "https://imglarger.com:8889/download/15a1e5a4-cba4-4df6-8d87-cb4afdbe7990/15a1e5a4-cba4-4df6-8d87-cb4afdbe7990.png",
+          text: "Isabella smiled, knowing that her adventure had taught her something truly valuable. She made her way back home, her heart full of joy and her mind filled with memories of the magical friends she had met. And she knew that more adventures awaited her in the future."
+        }
+      ]
+    };
+
+    // Build the storybook
+    function buildBook() {
+      const book = document.getElementById('book');
+      let html = '';
+
+      // Transparent first page
+      html += '<div class="page" style="background: transparent;"></div>';
+
+      // Cover page
+      html += `
+        <div class="page page-cover">
+          <div class="cover-emoji">📖</div>
+          <h1 class="cover-title">${storyData.child_name}'s Journey</h1>
+          <p class="cover-subtitle">A Magical Story</p>
+          <p class="cover-author">An Adventure with ${storyData.child_name}</p>
+        </div>
+      `;
+
+      // Story pages
+      storyData.pages.forEach((page, index) => {
+        const isLeft = index % 2 === 0;
+        const pageClass = isLeft ? 'page-left' : 'page-right';
+
+        html += `
+          <div class="page ${pageClass} story-page">
+            <img src="${page.image_url}" alt="Page ${page.page_number}" class="story-image" crossorigin="anonymous">
+            <p class="story-text">${page.text}</p>
+            <div class="page-num">${page.page_number}</div>
+          </div>
+        `;
+      });
+
+      // Back cover
+      html += `
+        <div class="page page-back">
+          <div class="cover-emoji">✨</div>
+          <h2 class="cover-title">The End</h2>
+          <p class="cover-subtitle">Thank you for reading!</p>
+        </div>
+      `;
+
+      // Transparent last page
+      html += '<div class="page" style="background: transparent;"></div>';
+
+      book.innerHTML = html;
+      initPageFlip();
+    }
+
+    // Initialize page flip
+    function initPageFlip() {
+      const book = document.getElementById('book');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+
+      const pageFlip = new St.PageFlip(book, {
+        width: 485,
+        height: 685,
+        size: 'fixed',
+        maxShadowOpacity: 0.5,
+        showCover: false,
+        mobileScrollSupport: false,
+        drawShadow: true,
+        flippingTime: 800,
+        usePortrait: true,
+        startPage: 1,
+        startZIndex: 0,
+        autoSize: false,
+        clickEventForward: true
+      });
+
+      pageFlip.loadFromHTML(document.querySelectorAll('#book .page'));
+
+      function updateNavigation() {
+        const currentPage = pageFlip.getCurrentPageIndex();
+        const totalPages = pageFlip.getPageCount();
+        prevBtn.disabled = currentPage === 0;
+        nextBtn.disabled = currentPage >= totalPages - 1;
+      }
+
+      pageFlip.on('flip', updateNavigation);
+      pageFlip.on('changeState', updateNavigation);
+
+      prevBtn.addEventListener('click', () => pageFlip.flipPrev());
+      nextBtn.addEventListener('click', () => pageFlip.flipNext());
+
+      updateNavigation();
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', buildBook);
+  </script>
+</body>
+</html>
