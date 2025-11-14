@@ -34,13 +34,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const apiKey = serverEntity.apiKey as string | undefined;
     const n8nServerUrl = serverEntity.n8nServerUrl as string | undefined;
 
+    // Strip server prefix from tool name if present
+    // Tool names come in format: "serverId__toolName" or "serverId__subserver__toolName"
+    // We need to extract just the base tool name (e.g., "list_files" from "onedrive-storage-mcp__list_files")
+    const originalToolName = toolName.includes('__')
+      ? toolName.split('__').pop() || toolName
+      : toolName;
+
+    console.log(`🔧 Tool execution: ${toolName} → ${originalToolName}`);
+
     // Prepare MCP request
     const mcpRequest: any = {
       jsonrpc: '2.0',
       id: Date.now(),
       method: 'tools/call',
       params: {
-        name: toolName,
+        name: originalToolName,
         arguments: toolArgs || {},
       },
     };
