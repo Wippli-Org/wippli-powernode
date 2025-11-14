@@ -659,17 +659,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Truncate conversation history to prevent token overflow
     // Keep only the last 6 messages (3 user/assistant turns)
     const MAX_HISTORY_MESSAGES = 6;
-    const truncatedHistory = (conversationHistory || []).slice(-MAX_HISTORY_MESSAGES);
+    let truncatedHistory = (conversationHistory || []).slice(-MAX_HISTORY_MESSAGES);
 
     if (conversationHistory && conversationHistory.length > truncatedHistory.length) {
       addLog('INFO', 'Context Manager', `Truncating conversation history: ${conversationHistory.length} → ${truncatedHistory.length} messages`);
     }
 
-    const conversationLength = truncatedHistory.length + 1;
-    const messages = [
+    // AGGRESSIVE TOKEN ESTIMATION - Estimate total token count before sending
+    // This prevents the "prompt is too long" error from ever reaching the user
+    function estimateTokens(messages: any[]): number {
+      const totalChars = messages.reduce((sum, msg) => {
+        const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+        return sum + content.length;
+      }, 0);
+      // Rough estimate: 1 token ≈ 4 characters
+      return Math.ceil(totalChars / 4);
+    }
+
+    // Build initial messages array
+    let messages = [
       ...truncatedHistory,
       { role: 'user', content: message }
     ];
+
+    // Estimate and truncate more aggressively if needed
+    let estimatedTokens = estimateTokens(messages);
+    const TOKEN_LIMIT = 180000; // Leave 20K buffer under the 200K limit
+
+    if (estimatedTokens > TOKEN_LIMIT) {
+      addLog('WARN', 'Context Manager', `Estimated ${estimatedTokens.toLocaleString()} tokens exceeds ${TOKEN_LIMIT.toLocaleString()} limit, truncating aggressively`);
+
+      // Try with only last 2 messages
+      truncatedHistory = (conversationHistory || []).slice(-2);
+      messages = [
+        ...truncatedHistory,
+        { role: 'user', content: message }
+      ];
+      estimatedTokens = estimateTokens(messages);
+
+      if (estimatedTokens > TOKEN_LIMIT) {
+        addLog('WARN', 'Context Manager', `Still too large (${estimatedTokens.toLocaleString()} tokens), using only current message`);
+        // Use only the current message with no history
+        truncatedHistory = [];
+        messages = [{ role: 'user', content: message }];
+        estimatedTokens = estimateTokens(messages);
+      }
+
+      addLog('INFO', 'Context Manager', `Final context: ${messages.length} messages, ~${estimatedTokens.toLocaleString()} tokens`);
+    }
+
+    const conversationLength = messages.length;
 
     addLog('AI', providerConfig.model, `Processing conversation`, {
       messages: conversationLength,
@@ -695,7 +734,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       requestBody.tools = tools.map(({ _serverId, _originalName, ...tool }) => tool);
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    let response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': providerConfig.apiKey,
@@ -705,9 +744,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: JSON.stringify(requestBody),
     });
 
+    // Handle token overflow errors with automatic retry
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`AI API error: ${response.status} - ${errorText}`);
+
+      // Check if it's a token overflow error
+      if (errorText.includes('prompt is too long') || errorText.includes('tokens >')) {
+        addLog('ERROR', 'Context Manager', `Token overflow detected despite estimation, retrying with minimal context`);
+
+        // Retry with ONLY the current message (no history at all)
+        const minimalMessages = [{ role: 'user', content: message }];
+        const minimalRequestBody = {
+          ...requestBody,
+          messages: minimalMessages,
+        };
+
+        addLog('INFO', 'Context Manager', `Retrying with zero history (only current message)`);
+
+        response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': providerConfig.apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(minimalRequestBody),
+        });
+
+        if (!response.ok) {
+          const retryErrorText = await response.text();
+          throw new Error(`AI API error after retry: ${response.status} - ${retryErrorText}`);
+        }
+
+        // Update messages to reflect what was actually sent
+        messages = minimalMessages;
+        truncatedHistory = [];
+        addLog('SUCCESS', 'Context Manager', `Retry successful with minimal context`);
+      } else {
+        // Different error, throw it
+        throw new Error(`AI API error: ${response.status} - ${errorText}`);
+      }
     }
 
     const data = await response.json();
