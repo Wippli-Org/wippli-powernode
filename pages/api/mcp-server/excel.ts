@@ -662,15 +662,73 @@ async function readWorkbook(args: any, fileBuffer?: Buffer): Promise<string> {
 
     const exists = await blockBlobClient.exists();
     if (!exists) {
-      throw new Error(`Workbook "${workbookFilename}" not found in blob storage. If reading from OneDrive, ensure file content is passed to the MCP server.`);
-    }
+      // File not in blob storage - try OneDrive as fallback
+      console.log(`📄 File not in blob storage, trying OneDrive: ${workbookFilename}`);
 
-    const downloadResponse = await blockBlobClient.download();
-    if (!downloadResponse.readableStreamBody) {
-      throw new Error('Failed to download workbook from blob storage');
-    }
+      try {
+        // Search for file in OneDrive using internal API
+        const connectionString = process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connectionString) {
+          throw new Error('Storage connection not configured for OneDrive lookup');
+        }
 
-    buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+        const tableClient = TableClient.fromConnectionString(connectionString, 'powernodeOneDriveConfig');
+        const oneDriveEntity = await tableClient.getEntity('default-user', 'onedrive-config');
+
+        if (!oneDriveEntity.accessToken) {
+          throw new Error('OneDrive not configured');
+        }
+
+        // Search for the file in OneDrive
+        const searchResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(workbookFilename)}')`,
+          {
+            headers: {
+              'Authorization': `Bearer ${oneDriveEntity.accessToken}`,
+            },
+          }
+        );
+
+        if (!searchResponse.ok) {
+          throw new Error(`OneDrive search failed: ${searchResponse.statusText}`);
+        }
+
+        const searchData = await searchResponse.json();
+        if (!searchData.value || searchData.value.length === 0) {
+          throw new Error(`File "${workbookFilename}" not found in OneDrive or blob storage`);
+        }
+
+        // Get the first matching file
+        const file = searchData.value[0];
+        console.log(`📄 Found file in OneDrive: ${file.name} (${file.id})`);
+
+        // Download the file from OneDrive
+        const downloadResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/me/drive/items/${file.id}/content`,
+          {
+            headers: {
+              'Authorization': `Bearer ${oneDriveEntity.accessToken}`,
+            },
+          }
+        );
+
+        if (!downloadResponse.ok) {
+          throw new Error(`Failed to download from OneDrive: ${downloadResponse.statusText}`);
+        }
+
+        buffer = Buffer.from(await downloadResponse.arrayBuffer());
+        console.log(`✅ Downloaded from OneDrive: ${(buffer.length / 1024).toFixed(2)}KB`);
+      } catch (oneDriveError: any) {
+        throw new Error(`Workbook "${workbookFilename}" not found in blob storage or OneDrive: ${oneDriveError.message}`);
+      }
+    } else {
+      const downloadResponse = await blockBlobClient.download();
+      if (!downloadResponse.readableStreamBody) {
+        throw new Error('Failed to download workbook from blob storage');
+      }
+
+      buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    }
   }
 
   const workbook = new ExcelJS.Workbook();
