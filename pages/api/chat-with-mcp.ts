@@ -156,7 +156,18 @@ async function planToolExecution(
         storageConfig
       );
 
-      metadata = JSON.parse(summaryResult);
+      // Handle both string and object responses
+      if (typeof summaryResult === 'string') {
+        try {
+          metadata = JSON.parse(summaryResult);
+        } catch (e) {
+          throw new Error(`Invalid JSON from read_workbook_summary: ${summaryResult.substring(0, 100)}`);
+        }
+      } else if (typeof summaryResult === 'object') {
+        metadata = summaryResult;
+      } else {
+        throw new Error(`Unexpected result type from read_workbook_summary: ${typeof summaryResult}`);
+      }
 
       addLog('SUCCESS', 'Planning Agent', `File metadata retrieved`, {
         fileSize: metadata.fileSize,
@@ -795,16 +806,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             } else if (originalToolName === 'read_file') {
               // Read OneDrive file
               const fileId = toolInput.fileId;
+              const fileName = toolInput.fileName || 'file';
               const downloadResponse = await fetch(`${req.headers.host?.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/storage/onedrive/download?fileId=${fileId}`);
 
               if (downloadResponse.ok) {
                 const fileBuffer = await downloadResponse.arrayBuffer();
-                const fileContent = Buffer.from(fileBuffer).toString('utf-8');
+                const buffer = Buffer.from(fileBuffer);
+
+                // For text files, return as string; for binary files (Excel, PDF, etc.), return base64
+                const isBinaryFile = fileName.match(/\.(xlsx?|docx?|pptx?|pdf|zip|bin)$/i);
+                const fileContent = isBinaryFile
+                  ? buffer.toString('base64')  // Binary files as base64
+                  : buffer.toString('utf-8');  // Text files as UTF-8
 
                 toolData = {
                   success: true,
                   result: {
-                    content: fileContent
+                    content: fileContent,
+                    encoding: isBinaryFile ? 'base64' : 'utf-8',
+                    fileName: fileName
                   }
                 };
               } else {

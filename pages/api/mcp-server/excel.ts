@@ -1835,7 +1835,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Convert fileContent from base64 if provided (from OneDrive, memory, etc.)
     let fileBuffer: Buffer | undefined;
     if (fileContent) {
-      fileBuffer = Buffer.from(fileContent, 'base64');
+      try {
+        fileBuffer = Buffer.from(fileContent, 'base64');
+        console.log(`📦 Received file buffer from request: ${(fileBuffer.length / 1024).toFixed(2)}KB`);
+      } catch (e: any) {
+        console.error(`❌ Failed to decode fileContent: ${e.message}`);
+      }
+    } else {
+      console.log(`ℹ️  No fileContent provided in request, will try storage lookup`);
     }
 
     switch (method) {
