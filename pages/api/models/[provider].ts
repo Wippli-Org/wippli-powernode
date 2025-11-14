@@ -12,22 +12,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    let models: string[] = [];
+    let models: any[] = [];
 
     switch (provider) {
       case 'anthropic':
-        // Anthropic doesn't have a public models endpoint
-        // Return common model names
-        models = [
-          'claude-sonnet-4-5-20250929',
-          'claude-sonnet-4-20250514',
-          'claude-opus-4-20250514',
-          'claude-3-5-sonnet-20241022',
-          'claude-3-5-sonnet-20240620',
-          'claude-3-opus-20240229',
-          'claude-3-sonnet-20240229',
-          'claude-3-haiku-20240307'
-        ];
+        // Fetch models from Anthropic API
+        const anthropicResponse = await fetch('https://api.anthropic.com/v1/models', {
+          headers: {
+            'x-api-key': apiKey as string,
+            'anthropic-version': '2023-06-01'
+          }
+        });
+
+        if (anthropicResponse.ok) {
+          const data = await anthropicResponse.json();
+          models = data.data.map((m: any) => ({
+            id: m.id,
+            name: m.display_name || m.id
+          }));
+        } else {
+          throw new Error('Failed to fetch Anthropic models');
+        }
         break;
 
       case 'openai':
@@ -42,8 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const data = await openaiResponse.json();
           models = data.data
             .filter((m: any) => m.id.includes('gpt'))
-            .map((m: any) => m.id)
-            .sort();
+            .map((m: any) => ({
+              id: m.id,
+              name: m.id
+            }))
+            .sort((a: any, b: any) => a.id.localeCompare(b.id));
         } else {
           throw new Error('Failed to fetch OpenAI models');
         }
@@ -52,13 +60,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'azureOpenAI':
         // Azure OpenAI models are deployment-specific
         // Return common model names
-        models = [
+        const azureModels = [
           'gpt-4o',
           'gpt-4o-mini',
           'gpt-4-turbo',
           'gpt-4',
           'gpt-35-turbo'
         ];
+        models = azureModels.map(id => ({ id, name: id }));
         break;
 
       case 'google':
@@ -69,8 +78,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const data = await googleResponse.json();
           models = data.models
             .filter((m: any) => m.name.includes('gemini'))
-            .map((m: any) => m.name.replace('models/', ''))
-            .sort();
+            .map((m: any) => ({
+              id: m.name.replace('models/', ''),
+              name: m.displayName || m.name.replace('models/', '')
+            }))
+            .sort((a: any, b: any) => a.id.localeCompare(b.id));
         } else {
           throw new Error('Failed to fetch Google models');
         }
@@ -79,10 +91,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'deepseek':
         // DeepSeek doesn't have a public models endpoint
         // Return common model names
-        models = [
+        const deepseekModels = [
           'deepseek-chat',
           'deepseek-coder'
         ];
+        models = deepseekModels.map(id => ({ id, name: id }));
         break;
 
       case 'ollama':
@@ -92,7 +105,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (ollamaResponse.ok) {
           const data = await ollamaResponse.json();
-          models = data.models?.map((m: any) => m.name) || [];
+          models = data.models?.map((m: any) => ({
+            id: m.name,
+            name: m.name
+          })) || [];
         } else {
           throw new Error('Failed to fetch Ollama models');
         }
@@ -116,25 +132,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-function getFallbackModels(provider: string): string[] {
-  switch (provider) {
-    case 'anthropic':
-      return [
-        'claude-sonnet-4-5-20250929',
-        'claude-3-5-sonnet-20241022',
-        'claude-3-opus-20240229'
-      ];
-    case 'openai':
-      return ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'];
-    case 'azureOpenAI':
-      return ['gpt-4o', 'gpt-4-turbo', 'gpt-35-turbo'];
-    case 'google':
-      return ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash'];
-    case 'deepseek':
-      return ['deepseek-chat', 'deepseek-coder'];
-    case 'ollama':
-      return ['llama3.2', 'llama3.1', 'codellama'];
-    default:
-      return [];
-  }
+function getFallbackModels(provider: string): any[] {
+  const fallbacks: { [key: string]: string[] } = {
+    'anthropic': ['claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'claude-3-5-sonnet-20241022'],
+    'openai': ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+    'azureOpenAI': ['gpt-4o', 'gpt-4-turbo', 'gpt-35-turbo'],
+    'google': ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+    'deepseek': ['deepseek-chat', 'deepseek-coder'],
+    'ollama': ['llama3.2', 'llama3.1', 'codellama']
+  };
+
+  const modelIds = fallbacks[provider] || [];
+  return modelIds.map(id => ({ id, name: id }));
 }
