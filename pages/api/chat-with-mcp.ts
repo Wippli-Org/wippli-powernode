@@ -1035,9 +1035,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // Build updated messages array
+      // Build updated messages array (use truncatedHistory to maintain size limits)
       const updatedMessages = [
-        ...(conversationHistory || []).map((m: any, idx: number) => ({
+        ...(truncatedHistory || []).map((m: any, idx: number) => ({
           id: `msg-${Date.now()}-${idx}`,
           role: m.role,
           content: m.content,
