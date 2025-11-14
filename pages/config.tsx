@@ -159,7 +159,7 @@ export default function ConfigPage() {
       return;
     }
 
-    setLoadingModels({ ...loadingModels, [provider]: true });
+    setLoadingModels(prev => ({ ...prev, [provider]: true }));
 
     try {
       let url = `/api/models/${provider}?apiKey=${encodeURIComponent(providerConfig.apiKey)}`;
@@ -172,15 +172,16 @@ export default function ConfigPage() {
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.models) {
-        setProviderModels({ ...providerModels, [provider]: data.models });
-      } else if (data.fallback) {
-        setProviderModels({ ...providerModels, [provider]: data.fallback });
+      // Use models if available and non-empty, otherwise use fallback
+      if (data.models && data.models.length > 0) {
+        setProviderModels(prev => ({ ...prev, [provider]: data.models }));
+      } else if (data.fallback && data.fallback.length > 0) {
+        setProviderModels(prev => ({ ...prev, [provider]: data.fallback }));
       }
     } catch (error) {
       console.error(`Failed to fetch ${provider} models:`, error);
     } finally {
-      setLoadingModels({ ...loadingModels, [provider]: false });
+      setLoadingModels(prev => ({ ...prev, [provider]: false }));
     }
   };
 
