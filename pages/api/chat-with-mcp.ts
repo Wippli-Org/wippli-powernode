@@ -70,6 +70,215 @@ function truncateToolResult(content: string, toolName: string, maxTokens: number
     `Use more specific tools or ranges to access the remaining data.`;
 }
 
+/**
+ * Helper function to execute a single MCP tool
+ * Used by the planning layer to fetch metadata
+ */
+async function executeSingleTool(
+  serverId: string,
+  toolName: string,
+  toolArgs: any,
+  userId: string,
+  host: string,
+  storageConfig?: any
+): Promise<any> {
+  const toolPayload: any = {
+    serverId,
+    toolName,
+    arguments: toolArgs,
+    userId,
+  };
+
+  if (storageConfig) {
+    toolPayload.storageConfig = storageConfig;
+  }
+
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const toolResponse = await fetch(`${protocol}://${host}/api/mcp/execute-tool`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(toolPayload),
+  });
+
+  const toolData = await toolResponse.json();
+
+  if (!toolData.success) {
+    throw new Error(toolData.error || 'Tool execution failed');
+  }
+
+  return toolData.result?.content || JSON.stringify(toolData.result);
+}
+
+/**
+ * Intelligent tool execution planner
+ * Intercepts large data operations and creates targeted execution plans
+ * Uses Claude to analyze user intent and create optimal data retrieval strategy
+ */
+async function planToolExecution(
+  toolUse: any,
+  userMessage: string,
+  serverId: string,
+  originalToolName: string,
+  userId: string,
+  host: string,
+  apiKey: string,
+  model: string,
+  storageConfig: any,
+  addLog: (level: string, component: string, message: string, details?: any) => void
+): Promise<any[]> {
+  const { input } = toolUse;
+
+  // Only plan for tools that might return large datasets
+  const needsPlanning = [
+    'read_workbook',
+    'onedrive_read_file'
+  ].includes(originalToolName);
+
+  if (!needsPlanning) {
+    return [toolUse]; // Execute directly without planning
+  }
+
+  addLog('INFO', 'Planning Agent', `🧠 Intelligent planning enabled for ${originalToolName}`);
+
+  try {
+    // Step 1: Get file metadata first (Excel-specific for now)
+    let metadata: any = null;
+
+    if (originalToolName === 'read_workbook') {
+      addLog('INFO', 'Planning Agent', `Fetching file metadata for: ${input.filename}`);
+
+      const summaryResult = await executeSingleTool(
+        serverId,
+        'read_workbook_summary',
+        { filename: input.filename },
+        userId,
+        host,
+        storageConfig
+      );
+
+      metadata = JSON.parse(summaryResult);
+
+      addLog('SUCCESS', 'Planning Agent', `File metadata retrieved`, {
+        fileSize: metadata.fileSize,
+        worksheets: metadata.worksheets?.length || 0,
+        totalRows: metadata.worksheets?.reduce((sum: number, ws: any) => sum + ws.rowCount, 0) || 0
+      });
+
+      // If file is small enough, skip planning and execute directly
+      const totalRows = metadata.worksheets?.reduce((sum: number, ws: any) => sum + ws.rowCount, 0) || 0;
+      if (totalRows <= 100) {
+        addLog('INFO', 'Planning Agent', `File is small (${totalRows} rows), executing directly without planning`);
+        return [toolUse];
+      }
+    }
+
+    // Step 2: Ask Claude to create an execution plan
+    addLog('INFO', 'Planning Agent', `Creating execution plan based on user intent`);
+
+    const planningPrompt = `You are a data retrieval planner. Your job is to create an efficient, targeted data retrieval plan.
+
+USER QUESTION: "${userMessage}"
+
+FILE METADATA:
+${JSON.stringify(metadata, null, 2)}
+
+AVAILABLE TOOLS:
+- read_workbook_summary: Get metadata only (already executed above)
+- read_workbook_page: Get specific page of rows (startRow, pageSize up to 100)
+- read_range: Get specific cell range (e.g., "A1:P50")
+- read_cell: Get individual cell value
+
+TASK:
+Analyze the user's question and determine the MINIMUM data needed to answer it accurately.
+
+Consider:
+1. Does the user need ALL data or just a sample?
+2. Which worksheet(s) are relevant?
+3. Which columns are needed based on the headers?
+4. How many rows are sufficient to answer the question?
+5. Can the answer be determined from metadata alone?
+
+Return a JSON execution plan (valid JSON only, no markdown):
+{
+  "reasoning": "Brief explanation of the strategy",
+  "estimatedTokens": 5000,
+  "toolCalls": [
+    {
+      "tool": "read_workbook_page",
+      "arguments": {
+        "filename": "...",
+        "sheetName": "...",
+        "startRow": 1,
+        "pageSize": 50
+      },
+      "purpose": "Why this tool call is needed"
+    }
+  ]
+}
+
+IMPORTANT: Return ONLY valid JSON, no other text.`;
+
+    const planningResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: planningPrompt
+          }
+        ]
+      }),
+    });
+
+    if (!planningResponse.ok) {
+      throw new Error(`Planning API error: ${planningResponse.status}`);
+    }
+
+    const planningData = await planningResponse.json();
+    const planText = planningData.content[0].text;
+
+    // Extract JSON from response (in case Claude adds markdown)
+    const jsonMatch = planText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid planning response: no JSON found');
+    }
+
+    const plan = JSON.parse(jsonMatch[0]);
+
+    addLog('SUCCESS', 'Planning Agent', `📋 Execution plan created`, {
+      reasoning: plan.reasoning,
+      estimatedTokens: plan.estimatedTokens,
+      toolCount: plan.toolCalls?.length || 0
+    });
+
+    // Step 3: Convert plan to tool use blocks
+    const plannedToolUses = plan.toolCalls.map((tc: any, index: number) => ({
+      type: 'tool_use',
+      id: `${toolUse.id}_planned_${index}`,
+      name: tc.tool,
+      input: tc.arguments,
+      _planning: {
+        purpose: tc.purpose,
+        originalTool: originalToolName
+      }
+    }));
+
+    return plannedToolUses;
+
+  } catch (error: any) {
+    addLog('ERROR', 'Planning Agent', `Planning failed: ${error.message}. Falling back to direct execution.`);
+    // Fall back to original tool execution
+    return [toolUse];
+  }
+}
+
 // MCP Gateway URL - disabled to prevent network interference
 // const MCP_GATEWAY_URL = 'https://wippli-power-mcp.victoriousocean-8ee46cea.australiaeast.azurecontainerapps.io';
 
@@ -508,10 +717,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Find all tool_use content blocks
       const toolUseBlocks = currentResponse.content.filter((block: any) => block.type === 'tool_use');
 
+      // INTELLIGENT PLANNING LAYER - intercept and plan large data operations
+      let plannedToolUseBlocks: any[] = [];
       for (const toolUse of toolUseBlocks) {
         const toolName = toolUse.name;
-        const toolInput = toolUse.input;
-        const toolUseId = toolUse.id;
 
         // Find the tool definition to get server info
         const toolDef = tools.find(t => t.name === toolName);
@@ -522,6 +731,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const serverId = toolDef._serverId;
         const originalToolName = toolDef._originalName;
+
+        // Prepare storage config for planning
+        const planningStorageConfig = (fileContent && oneDriveConfig) ? {
+          provider: 'onedrive',
+          accessToken: oneDriveConfig.accessToken,
+          fileContent: fileContent.toString('base64'),
+        } : undefined;
+
+        // Call planning layer - returns original tool or planned tools
+        const plannedTools = await planToolExecution(
+          toolUse,
+          message,
+          serverId,
+          originalToolName,
+          creatorId,
+          req.headers.host || 'localhost',
+          providerConfig.apiKey,
+          providerConfig.model,
+          planningStorageConfig,
+          addLog
+        );
+
+        // Add planned tools to execution queue with their metadata
+        for (const plannedTool of plannedTools) {
+          plannedToolUseBlocks.push({
+            ...plannedTool,
+            _serverId: serverId,
+            _originalName: plannedTool.name, // Use the planned tool name
+            _originalToolUseId: toolUse.id   // Track original ID for result mapping
+          });
+        }
+      }
+
+      // Execute all planned tools
+      for (const toolUse of plannedToolUseBlocks) {
+        const toolName = toolUse.name;
+        const toolInput = toolUse.input;
+        const toolUseId = toolUse.id;
+        const serverId = toolUse._serverId;
+        const originalToolName = toolUse._originalName;
+        const originalToolUseId = toolUse._originalToolUseId;
 
         addLog('INFO', 'MCP Executor', `Executing ${originalToolName} on ${serverId}`, { input: toolInput });
 
@@ -612,26 +862,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               truncatedSize: `${(truncatedContent.length / 1024).toFixed(1)}KB`,
             });
 
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: toolUseId,
-              content: truncatedContent,
-            });
+            // Map result to original tool_use_id (for planned tools)
+            const resultToolUseId = originalToolUseId || toolUseId;
+
+            // Check if we already have a result for this original tool (from previous planned executions)
+            const existingResultIndex = toolResults.findIndex(r => r.tool_use_id === resultToolUseId);
+
+            if (existingResultIndex >= 0 && toolUse._planning) {
+              // Combine with existing result from other planned tools
+              const existing = toolResults[existingResultIndex];
+              toolResults[existingResultIndex] = {
+                ...existing,
+                content: existing.content + '\n\n---\n\n' + truncatedContent
+              };
+              addLog('INFO', 'Planning Agent', `Combined result with previous planned tool execution`);
+            } else {
+              // First result for this tool, or not a planned tool
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: resultToolUseId,
+                content: truncatedContent,
+              });
+            }
             totalToolExecutions++; // Count successful tool execution
           } else {
             addLog('ERROR', 'MCP Executor', `Tool execution failed: ${toolData.error}`);
+            const resultToolUseId = originalToolUseId || toolUseId;
             toolResults.push({
               type: 'tool_result',
-              tool_use_id: toolUseId,
+              tool_use_id: resultToolUseId,
               content: `Error: ${toolData.error || 'Tool execution failed'}`,
               is_error: true,
             });
           }
         } catch (error: any) {
           addLog('ERROR', 'MCP Executor', `Failed to execute tool: ${error.message}`);
+          const resultToolUseId = originalToolUseId || toolUseId;
           toolResults.push({
             type: 'tool_result',
-            tool_use_id: toolUseId,
+            tool_use_id: resultToolUseId,
             content: `Error: ${error.message}`,
             is_error: true,
           });
