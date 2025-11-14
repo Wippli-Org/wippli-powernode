@@ -9,41 +9,43 @@ import { TableClient } from '@azure/data-tables';
  *
  * Following n8n MCP pattern - no child processes, clean JSON-RPC 2.0
  *
- * COMPREHENSIVE 24-TOOL SUITE:
+ * COMPREHENSIVE 26-TOOL SUITE:
  *
  * WORKBOOK MANAGEMENT:
  * 1. create_workbook - Create new Excel workbooks
- * 2. read_workbook - Read and extract Excel workbook content
- * 3. list_workbooks - List available .xlsx files
- * 4. delete_workbook - Delete workbooks from blob storage
- * 5. get_workbook_url - Get temporary download URLs (1 hour expiry)
- * 6. copy_workbook - Copy/duplicate a workbook
+ * 2. read_workbook - Read and extract Excel workbook content (use pagination tools for large files)
+ * 3. read_workbook_summary - Get metadata/structure without loading full data (ALWAYS use first for large files)
+ * 4. read_workbook_page - Paginated access to specific rows (for large datasets)
+ * 5. list_workbooks - List available .xlsx files
+ * 6. delete_workbook - Delete workbooks from blob storage
+ * 7. get_workbook_url - Get temporary download URLs (1 hour expiry)
+ * 8. copy_workbook - Copy/duplicate a workbook
  *
  * TEMPLATE MANAGEMENT:
- * 7. upload_template - Upload an Excel template to blob storage
- * 8. list_templates - List all available templates
- * 9. create_from_template - Create workbook from template with variable substitution
- * 10. delete_template - Delete a template from storage
+ * 9. upload_template - Upload an Excel template to blob storage
+ * 10. list_templates - List all available templates
+ * 11. create_from_template - Create workbook from template with variable substitution
+ * 12. delete_template - Delete a template from storage
  *
  * WORKSHEET OPERATIONS:
- * 11. add_worksheet - Add a new worksheet to a workbook
- * 12. delete_worksheet - Delete a worksheet from a workbook
- * 13. rename_worksheet - Rename a worksheet
- * 14. list_worksheets - List all worksheets in a workbook
+ * 13. add_worksheet - Add a new worksheet to a workbook
+ * 14. delete_worksheet - Delete a worksheet from a workbook
+ * 15. rename_worksheet - Rename a worksheet
+ * 16. list_worksheets - List all worksheets in a workbook
  *
  * DATA OPERATIONS:
- * 15. write_cell - Write data to a specific cell
- * 16. write_range - Write data to a range of cells
- * 17. read_cell - Read data from a specific cell
- * 18. read_range - Read data from a range of cells
- * 19. append_row - Append a row to a worksheet
- * 20. insert_row - Insert a row at a specific position
+ * 17. write_cell - Write data to a specific cell
+ * 18. write_range - Write data to a range of cells
+ * 19. read_cell - Read data from a specific cell
+ * 20. read_range - Read data from a range of cells
+ * 21. append_row - Append a row to a worksheet
+ * 22. insert_row - Insert a row at a specific position
  *
  * FORMATTING & ADVANCED:
- * 21. format_cells - Apply formatting (font, fill, borders) to cells
- * 22. create_chart - Create charts (bar, line, pie, etc.)
- * 23. add_formula - Add Excel formulas to cells
- * 24. analyze_data - AI-powered data analysis and insights
+ * 23. format_cells - Apply formatting (font, fill, borders) to cells
+ * 24. create_chart - Create charts (bar, line, pie, etc.)
+ * 25. add_formula - Add Excel formulas to cells
+ * 26. analyze_data - AI-powered data analysis and insights
  */
 
 // Initialize clients (lazy loaded)
@@ -143,7 +145,7 @@ const TOOLS = [
   },
   {
     name: 'read_workbook',
-    description: 'Read and extract content from an Excel workbook',
+    description: 'Read and extract content from an Excel workbook. WARNING: For large files (>100 rows), use read_workbook_summary first to check size, then use read_workbook_page for paginated access to avoid token overflow.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -153,6 +155,48 @@ const TOOLS = [
         }
       },
       required: ['filename']
+    }
+  },
+  {
+    name: 'read_workbook_summary',
+    description: 'Get metadata and structure of an Excel workbook without loading full data. Returns filename, worksheet names, row counts, column counts, and headers only. ALWAYS use this FIRST for large files before attempting to read data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Workbook filename (.xlsx file)'
+        }
+      },
+      required: ['filename']
+    }
+  },
+  {
+    name: 'read_workbook_page',
+    description: 'Read a specific page/range of rows from a worksheet. Use after read_workbook_summary to get paginated access to large datasets. Returns specified rows with proper pagination.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: {
+          type: 'string',
+          description: 'Workbook filename (.xlsx file)'
+        },
+        sheetName: {
+          type: 'string',
+          description: 'Worksheet name to read from'
+        },
+        startRow: {
+          type: 'number',
+          description: 'Starting row number (1-based, includes headers)',
+          default: 1
+        },
+        pageSize: {
+          type: 'number',
+          description: 'Number of rows to return (default: 50, max: 100)',
+          default: 50
+        }
+      },
+      required: ['filename', 'sheetName']
     }
   },
   {
@@ -757,6 +801,260 @@ async function readWorkbook(args: any, fileBuffer?: Buffer): Promise<string> {
 
     result.worksheets.push(sheetData);
   });
+
+  return JSON.stringify(result, null, 2);
+}
+
+/**
+ * Read workbook summary - returns metadata and structure only (no full data)
+ * Perfect for checking file size before loading full data
+ */
+async function readWorkbookSummary(args: any, fileBuffer?: Buffer): Promise<string> {
+  const { filename } = args;
+  const workbookFilename = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+
+  let buffer: Buffer;
+
+  // Reuse same file loading logic as readWorkbook
+  if (fileBuffer) {
+    console.log(`📊 Reading Excel summary from memory: ${workbookFilename} (${(fileBuffer.length / 1024).toFixed(2)}KB)`);
+    buffer = fileBuffer;
+  } else {
+    console.log(`📊 Reading Excel summary from storage: ${workbookFilename}`);
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(workbookFilename);
+
+    const exists = await blockBlobClient.exists();
+    if (!exists) {
+      // Try OneDrive fallback
+      console.log(`📊 File not in blob storage, trying OneDrive: ${workbookFilename}`);
+
+      try {
+        const connectionString = process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connectionString) {
+          throw new Error('Storage connection not configured for OneDrive lookup');
+        }
+
+        const tableClient = TableClient.fromConnectionString(connectionString, 'powernodeOneDriveConfig');
+        const oneDriveEntity = await tableClient.getEntity('default-user', 'onedrive-config');
+
+        if (!oneDriveEntity.accessToken) {
+          throw new Error('OneDrive not configured');
+        }
+
+        const searchResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(workbookFilename)}')`,
+          {
+            headers: {
+              'Authorization': `Bearer ${oneDriveEntity.accessToken}`,
+            },
+          }
+        );
+
+        if (!searchResponse.ok) {
+          throw new Error(`OneDrive search failed: ${searchResponse.statusText}`);
+        }
+
+        const searchData = await searchResponse.json();
+        if (!searchData.value || searchData.value.length === 0) {
+          throw new Error(`File "${workbookFilename}" not found in OneDrive or blob storage`);
+        }
+
+        const file = searchData.value[0];
+        console.log(`📊 Found file in OneDrive: ${file.name} (${file.id})`);
+
+        const downloadResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/me/drive/items/${file.id}/content`,
+          {
+            headers: {
+              'Authorization': `Bearer ${oneDriveEntity.accessToken}`,
+            },
+          }
+        );
+
+        if (!downloadResponse.ok) {
+          throw new Error(`Failed to download from OneDrive: ${downloadResponse.statusText}`);
+        }
+
+        buffer = Buffer.from(await downloadResponse.arrayBuffer());
+        console.log(`✅ Downloaded from OneDrive: ${(buffer.length / 1024).toFixed(2)}KB`);
+      } catch (oneDriveError: any) {
+        throw new Error(`Workbook "${workbookFilename}" not found in blob storage or OneDrive: ${oneDriveError.message}`);
+      }
+    } else {
+      const downloadResponse = await blockBlobClient.download();
+      if (!downloadResponse.readableStreamBody) {
+        throw new Error('Failed to download workbook from blob storage');
+      }
+
+      buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    }
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+
+  const result: any = {
+    filename: workbookFilename,
+    fileSize: `${(buffer.length / 1024).toFixed(2)}KB`,
+    worksheets: []
+  };
+
+  // Only extract metadata, not full data
+  workbook.eachSheet((worksheet) => {
+    const headers: any[] = [];
+
+    // Get first row as headers
+    const firstRow = worksheet.getRow(1);
+    firstRow.eachCell({ includeEmpty: true }, (cell) => {
+      headers.push(cell.value);
+    });
+
+    result.worksheets.push({
+      name: worksheet.name,
+      rowCount: worksheet.rowCount,
+      columnCount: worksheet.columnCount,
+      headers: headers,
+      note: `Use read_workbook_page to access specific rows. Total rows: ${worksheet.rowCount}`
+    });
+  });
+
+  return JSON.stringify(result, null, 2);
+}
+
+/**
+ * Read workbook page - returns paginated rows from a specific worksheet
+ * Use after readWorkbookSummary to access specific data chunks
+ */
+async function readWorkbookPage(args: any, fileBuffer?: Buffer): Promise<string> {
+  const { filename, sheetName, startRow = 1, pageSize = 50 } = args;
+  const workbookFilename = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+
+  // Enforce max page size to prevent token overflow
+  const effectivePageSize = Math.min(pageSize, 100);
+
+  let buffer: Buffer;
+
+  // Reuse same file loading logic
+  if (fileBuffer) {
+    console.log(`📄 Reading Excel page from memory: ${workbookFilename}`);
+    buffer = fileBuffer;
+  } else {
+    console.log(`📄 Reading Excel page from storage: ${workbookFilename}`);
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(workbookFilename);
+
+    const exists = await blockBlobClient.exists();
+    if (!exists) {
+      // Try OneDrive fallback
+      console.log(`📄 File not in blob storage, trying OneDrive: ${workbookFilename}`);
+
+      try {
+        const connectionString = process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connectionString) {
+          throw new Error('Storage connection not configured for OneDrive lookup');
+        }
+
+        const tableClient = TableClient.fromConnectionString(connectionString, 'powernodeOneDriveConfig');
+        const oneDriveEntity = await tableClient.getEntity('default-user', 'onedrive-config');
+
+        if (!oneDriveEntity.accessToken) {
+          throw new Error('OneDrive not configured');
+        }
+
+        const searchResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(workbookFilename)}')`,
+          {
+            headers: {
+              'Authorization': `Bearer ${oneDriveEntity.accessToken}`,
+            },
+          }
+        );
+
+        if (!searchResponse.ok) {
+          throw new Error(`OneDrive search failed: ${searchResponse.statusText}`);
+        }
+
+        const searchData = await searchResponse.json();
+        if (!searchData.value || searchData.value.length === 0) {
+          throw new Error(`File "${workbookFilename}" not found in OneDrive or blob storage`);
+        }
+
+        const file = searchData.value[0];
+        console.log(`📄 Found file in OneDrive: ${file.name} (${file.id})`);
+
+        const downloadResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/me/drive/items/${file.id}/content`,
+          {
+            headers: {
+              'Authorization': `Bearer ${oneDriveEntity.accessToken}`,
+            },
+          }
+        );
+
+        if (!downloadResponse.ok) {
+          throw new Error(`Failed to download from OneDrive: ${downloadResponse.statusText}`);
+        }
+
+        buffer = Buffer.from(await downloadResponse.arrayBuffer());
+        console.log(`✅ Downloaded from OneDrive: ${(buffer.length / 1024).toFixed(2)}KB`);
+      } catch (oneDriveError: any) {
+        throw new Error(`Workbook "${workbookFilename}" not found in blob storage or OneDrive: ${oneDriveError.message}`);
+      }
+    } else {
+      const downloadResponse = await blockBlobClient.download();
+      if (!downloadResponse.readableStreamBody) {
+        throw new Error('Failed to download workbook from blob storage');
+      }
+
+      buffer = await streamToBuffer(downloadResponse.readableStreamBody);
+    }
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+
+  // Find the worksheet
+  const worksheet = workbook.getWorksheet(sheetName);
+  if (!worksheet) {
+    throw new Error(`Worksheet "${sheetName}" not found in workbook "${workbookFilename}"`);
+  }
+
+  const endRow = Math.min(startRow + effectivePageSize - 1, worksheet.rowCount);
+  const data: any[] = [];
+
+  // Extract the requested page of rows
+  for (let rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
+    const row = worksheet.getRow(rowIndex);
+    const rowData: any[] = [];
+
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      rowData.push(cell.value);
+    });
+
+    data.push(rowData);
+  }
+
+  const result = {
+    filename: workbookFilename,
+    worksheet: sheetName,
+    totalRows: worksheet.rowCount,
+    page: {
+      startRow,
+      endRow,
+      rowsReturned: data.length,
+      data
+    },
+    hasMore: endRow < worksheet.rowCount,
+    nextPage: endRow < worksheet.rowCount ? {
+      startRow: endRow + 1,
+      pageSize: effectivePageSize
+    } : null
+  };
 
   return JSON.stringify(result, null, 2);
 }
@@ -1578,6 +1876,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             break;
           case 'read_workbook':
             result = await readWorkbook(args, fileBuffer);
+            break;
+          case 'read_workbook_summary':
+            result = await readWorkbookSummary(args, fileBuffer);
+            break;
+          case 'read_workbook_page':
+            result = await readWorkbookPage(args, fileBuffer);
             break;
           case 'list_workbooks':
             result = await listWorkbooks(args || {});

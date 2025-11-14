@@ -14,6 +14,62 @@ const POWERNODE_STORAGE_CONNECTION =
   process.env.POWERNODE_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || '';
 const ONEDRIVE_TABLE_NAME = 'powernodeOneDriveConfig';
 
+/**
+ * Intelligent content truncation to prevent token overflow
+ * Estimates tokens (1 token ≈ 4 characters) and truncates large results
+ * Provides summaries for structured data (Excel, JSON)
+ */
+function truncateToolResult(content: string, toolName: string, maxTokens: number = 50000): string {
+  // Estimate tokens (rough: 1 token ≈ 4 characters)
+  const estimatedTokens = content.length / 4;
+
+  if (estimatedTokens <= maxTokens) {
+    return content; // No truncation needed
+  }
+
+  console.log(`⚠️ Tool result too large: ${Math.round(estimatedTokens).toLocaleString()} tokens (tool: ${toolName})`);
+
+  // Handle different tool types intelligently
+  if (toolName.includes('read_workbook') || toolName.includes('read_file')) {
+    // Try to parse as JSON and provide summary
+    try {
+      const data = JSON.parse(content);
+
+      if (data.worksheets && Array.isArray(data.worksheets)) {
+        // Excel data - provide summary + sample
+        console.log(`📊 Truncating Excel data: ${data.worksheets.length} worksheet(s)`);
+        return JSON.stringify({
+          filename: data.filename,
+          worksheets: data.worksheets.map((ws: any) => ({
+            name: ws.name,
+            rowCount: ws.rowCount,
+            columnCount: ws.columnCount,
+            headers: ws.data?.[0] || [],  // First row (headers)
+            sampleRows: ws.data?.slice(1, 6) || [], // Rows 2-6 (5 sample rows)
+            truncated: true,
+            note: `Showing 5 of ${ws.rowCount} rows. For specific data, use:\n` +
+                  `- read_range tool with range like "A1:P50" for specific rows\n` +
+                  `- read_cell tool for individual cells\n` +
+                  `- Ask me to analyze specific sections`
+          }))
+        }, null, 2);
+      }
+    } catch (e) {
+      // Not JSON or parsing failed, continue to text truncation
+    }
+  }
+
+  // Default truncation for text content
+  const truncatedLength = maxTokens * 4;
+  const truncatedContent = content.substring(0, truncatedLength);
+
+  return truncatedContent +
+    `\n\n[CONTENT TRUNCATED]\n` +
+    `Original size: ${Math.round(estimatedTokens).toLocaleString()} tokens\n` +
+    `Showing: ${maxTokens.toLocaleString()} tokens\n` +
+    `Use more specific tools or ranges to access the remaining data.`;
+}
+
 // MCP Gateway URL - disabled to prevent network interference
 // const MCP_GATEWAY_URL = 'https://wippli-power-mcp.victoriousocean-8ee46cea.australiaeast.azurecontainerapps.io';
 
@@ -547,14 +603,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // MCP tools return {content: "..."} format - extract the content field
             const toolResultContent = toolData.result?.content || JSON.stringify(toolData.result);
 
+            // Apply intelligent truncation to prevent token overflow
+            const truncatedContent = truncateToolResult(toolResultContent, originalToolName, 50000);
+
             addLog('SUCCESS', 'MCP Executor', `Tool executed successfully (${toolDuration}ms)`, {
-              result: typeof toolResultContent === 'string' ? toolResultContent.substring(0, 100) : toolResultContent,
+              result: typeof truncatedContent === 'string' ? truncatedContent.substring(0, 100) : truncatedContent,
+              originalSize: `${(toolResultContent.length / 1024).toFixed(1)}KB`,
+              truncatedSize: `${(truncatedContent.length / 1024).toFixed(1)}KB`,
             });
 
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUseId,
-              content: toolResultContent,
+              content: truncatedContent,
             });
             totalToolExecutions++; // Count successful tool execution
           } else {
