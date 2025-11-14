@@ -19,7 +19,7 @@ const ONEDRIVE_TABLE_NAME = 'powernodeOneDriveConfig';
  * Estimates tokens (1 token ≈ 4 characters) and truncates large results
  * Provides summaries for structured data (Excel, JSON)
  */
-function truncateToolResult(content: string, toolName: string, maxTokens: number = 50000): string {
+function truncateToolResult(content: string, toolName: string, maxTokens: number = 5000): string {
   // Estimate tokens (rough: 1 token ≈ 4 characters)
   const estimatedTokens = content.length / 4;
 
@@ -27,7 +27,7 @@ function truncateToolResult(content: string, toolName: string, maxTokens: number
     return content; // No truncation needed
   }
 
-  console.log(`⚠️ Tool result too large: ${Math.round(estimatedTokens).toLocaleString()} tokens (tool: ${toolName})`);
+  console.log(`⚠️ Tool result too large: ${Math.round(estimatedTokens).toLocaleString()} tokens (tool: ${toolName}), truncating to ${maxTokens}`);
 
   // Handle different tool types intelligently
   if (toolName.includes('read_workbook') || toolName.includes('read_file')) {
@@ -36,7 +36,7 @@ function truncateToolResult(content: string, toolName: string, maxTokens: number
       const data = JSON.parse(content);
 
       if (data.worksheets && Array.isArray(data.worksheets)) {
-        // Excel data - provide summary + sample
+        // Excel data - provide summary + minimal sample
         console.log(`📊 Truncating Excel data: ${data.worksheets.length} worksheet(s)`);
         return JSON.stringify({
           filename: data.filename,
@@ -45,10 +45,11 @@ function truncateToolResult(content: string, toolName: string, maxTokens: number
             rowCount: ws.rowCount,
             columnCount: ws.columnCount,
             headers: ws.data?.[0] || [],  // First row (headers)
-            sampleRows: ws.data?.slice(1, 6) || [], // Rows 2-6 (5 sample rows)
+            sampleRows: ws.data?.slice(1, 3) || [], // Rows 2-3 (2 sample rows only)
             truncated: true,
-            note: `Showing 5 of ${ws.rowCount} rows. For specific data, use:\n` +
-                  `- read_range tool with range like "A1:P50" for specific rows\n` +
+            note: `Showing 2 of ${ws.rowCount} rows. For specific data, use:\n` +
+                  `- read_workbook_page tool with startRow and pageSize for specific rows\n` +
+                  `- read_range tool with range like "A1:P50"\n` +
                   `- read_cell tool for individual cells\n` +
                   `- Ask me to analyze specific sections`
           }))
@@ -59,7 +60,7 @@ function truncateToolResult(content: string, toolName: string, maxTokens: number
     }
   }
 
-  // Default truncation for text content
+  // Default truncation for text content - much more aggressive
   const truncatedLength = maxTokens * 4;
   const truncatedContent = content.substring(0, truncatedLength);
 
@@ -177,10 +178,12 @@ async function planToolExecution(
 
       // If file is small enough, skip planning and execute directly
       const totalRows = metadata.worksheets?.reduce((sum: number, ws: any) => sum + ws.rowCount, 0) || 0;
-      if (totalRows <= 100) {
+      if (totalRows <= 50) {
         addLog('INFO', 'Planning Agent', `File is small (${totalRows} rows), executing directly without planning`);
         return [toolUse];
       }
+
+      addLog('INFO', 'Planning Agent', `File is large (${totalRows} rows), creating intelligent execution plan`);
     }
 
     // Step 2: Ask Claude to create an execution plan
@@ -653,9 +656,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Call REAL AI API
     addLog('INFO', 'AI Provider', `Using ${provider} provider`);
 
-    const conversationLength = (conversationHistory?.length || 0) + 1;
+    // Truncate conversation history to prevent token overflow
+    // Keep only the last 6 messages (3 user/assistant turns)
+    const MAX_HISTORY_MESSAGES = 6;
+    const truncatedHistory = (conversationHistory || []).slice(-MAX_HISTORY_MESSAGES);
+
+    if (conversationHistory && conversationHistory.length > truncatedHistory.length) {
+      addLog('INFO', 'Context Manager', `Truncating conversation history: ${conversationHistory.length} → ${truncatedHistory.length} messages`);
+    }
+
+    const conversationLength = truncatedHistory.length + 1;
     const messages = [
-      ...(conversationHistory || []),
+      ...truncatedHistory,
       { role: 'user', content: message }
     ];
 
@@ -874,7 +886,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const toolResultContent = toolData.result?.content || JSON.stringify(toolData.result);
 
             // Apply intelligent truncation to prevent token overflow
-            const truncatedContent = truncateToolResult(toolResultContent, originalToolName, 50000);
+            const truncatedContent = truncateToolResult(toolResultContent, originalToolName, 5000);
 
             addLog('SUCCESS', 'MCP Executor', `Tool executed successfully (${toolDuration}ms)`, {
               result: typeof truncatedContent === 'string' ? truncatedContent.substring(0, 100) : truncatedContent,
