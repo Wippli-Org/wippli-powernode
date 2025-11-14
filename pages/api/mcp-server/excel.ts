@@ -642,21 +642,36 @@ async function createWorkbook(args: any): Promise<string> {
   return `Workbook created: ${workbookFilename}`;
 }
 
-async function readWorkbook(args: any): Promise<string> {
+async function readWorkbook(args: any, fileBuffer?: Buffer): Promise<string> {
   const { filename } = args;
   const workbookFilename = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
 
-  const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
-  const blobClient = getBlobClient();
-  const containerClient = blobClient.getContainerClient(containerName);
-  const blockBlobClient = containerClient.getBlockBlobClient(workbookFilename);
+  let buffer: Buffer;
 
-  const downloadResponse = await blockBlobClient.download();
-  if (!downloadResponse.readableStreamBody) {
-    throw new Error('Failed to download workbook');
+  // If file buffer provided directly (from OneDrive, memory, etc.), use it
+  if (fileBuffer) {
+    console.log(`📄 Reading Excel file from memory: ${workbookFilename} (${(fileBuffer.length / 1024).toFixed(2)}KB)`);
+    buffer = fileBuffer;
+  } else {
+    // Otherwise, try to read from blob storage
+    console.log(`📄 Reading Excel file from blob storage: ${workbookFilename}`);
+    const containerName = process.env.DEFAULT_CONTAINER || 'wippli-documents';
+    const blobClient = getBlobClient();
+    const containerClient = blobClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(workbookFilename);
+
+    const exists = await blockBlobClient.exists();
+    if (!exists) {
+      throw new Error(`Workbook "${workbookFilename}" not found in blob storage. If reading from OneDrive, ensure file content is passed to the MCP server.`);
+    }
+
+    const downloadResponse = await blockBlobClient.download();
+    if (!downloadResponse.readableStreamBody) {
+      throw new Error('Failed to download workbook from blob storage');
+    }
+
+    buffer = await streamToBuffer(downloadResponse.readableStreamBody);
   }
-
-  const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
@@ -1458,9 +1473,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { method, params, id } = req.body;
+  const { method, params, id, fileContent } = req.body;
 
   try {
+    // Convert fileContent from base64 if provided (from OneDrive, memory, etc.)
+    let fileBuffer: Buffer | undefined;
+    if (fileContent) {
+      fileBuffer = Buffer.from(fileContent, 'base64');
+    }
+
     switch (method) {
       case 'initialize':
         return res.json({
@@ -1498,7 +1519,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             result = await createWorkbook(args);
             break;
           case 'read_workbook':
-            result = await readWorkbook(args);
+            result = await readWorkbook(args, fileBuffer);
             break;
           case 'list_workbooks':
             result = await listWorkbooks(args || {});

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { TableClient } from '@azure/data-tables';
+import { BlobServiceClient } from '@azure/storage-blob';
 
 interface LogEntry {
   timestamp: string;

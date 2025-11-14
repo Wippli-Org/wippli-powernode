@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { serverId, toolName, arguments: toolArgs, userId = 'default-user' } = req.body;
+  const { serverId, toolName, arguments: toolArgs, userId = 'default-user', storageConfig } = req.body;
 
   // Get instance configuration for multi-instance support
   const instanceConfig = getInstanceConfig();
@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const n8nServerUrl = serverEntity.n8nServerUrl as string | undefined;
 
     // Prepare MCP request
-    const mcpRequest = {
+    const mcpRequest: any = {
       jsonrpc: '2.0',
       id: Date.now(),
       method: 'tools/call',
@@ -44,6 +44,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         arguments: toolArgs || {},
       },
     };
+
+    // If file content provided (from OneDrive, memory, etc.), pass it to MCP server
+    if (storageConfig?.fileContent) {
+      mcpRequest.fileContent = storageConfig.fileContent;
+      console.log(`📤 Passing file content to MCP server (${(Buffer.from(storageConfig.fileContent, 'base64').length / 1024).toFixed(2)}KB)`);
+    }
 
     // Prepare headers
     const headers: Record<string, string> = {
