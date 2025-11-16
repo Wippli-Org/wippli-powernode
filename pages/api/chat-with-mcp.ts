@@ -1082,15 +1082,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Check if it's a token overflow error during continuation
         if (errorText.includes('prompt is too long') || errorText.includes('tokens >')) {
-          addLog('ERROR', 'Context Manager', `Continuation token overflow despite estimation, retrying with absolute minimal context`);
+          addLog('ERROR', 'Context Manager', `Continuation token overflow despite estimation, retrying with EMERGENCY truncation`);
 
-          // Retry with assistant response + tool results (no previous context)
+          // EMERGENCY TRUNCATION: Tool results are too large (200K+ tokens)
+          // Drastically truncate each tool result to absolute minimum (500 tokens max)
+          const emergencyTruncatedResults = toolResults.map((result: any) => {
+            if (result.content && typeof result.content === 'string') {
+              const maxChars = 500 * 4; // ~500 tokens
+              if (result.content.length > maxChars) {
+                const truncated = result.content.substring(0, maxChars);
+                addLog('WARN', 'Context Manager', `Emergency truncating tool result from ${result.content.length} to ${maxChars} chars`);
+                return {
+                  ...result,
+                  content: truncated + '\n\n[EMERGENCY TRUNCATION: Content too large for context. Summary provided.]'
+                };
+              }
+            }
+            return result;
+          });
+
+          // Retry with assistant response + EMERGENCY truncated tool results (no previous context)
           // IMPORTANT: Must include assistant message because tool_result blocks need corresponding tool_use blocks
           const assistantMsg = { role: 'assistant', content: currentResponse.content };
-          const toolResultsMsg = { role: 'user', content: toolResults };
+          const toolResultsMsg = { role: 'user', content: emergencyTruncatedResults };
           const minimalContinuation = [assistantMsg, toolResultsMsg];
 
-          addLog('INFO', 'Context Manager', `Retrying continuation with assistant + tool results (no history)`);
+          addLog('INFO', 'Context Manager', `Retrying continuation with assistant + emergency truncated tool results`);
 
           continuationResponse = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
