@@ -1084,11 +1084,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (errorText.includes('prompt is too long') || errorText.includes('tokens >')) {
           addLog('ERROR', 'Context Manager', `Continuation token overflow despite estimation, retrying with absolute minimal context`);
 
-          // Retry with ONLY the tool results (no previous context, no assistant response)
+          // Retry with assistant response + tool results (no previous context)
+          // IMPORTANT: Must include assistant message because tool_result blocks need corresponding tool_use blocks
+          const assistantMsg = { role: 'assistant', content: currentResponse.content };
           const toolResultsMsg = { role: 'user', content: toolResults };
-          const minimalContinuation = [toolResultsMsg];
+          const minimalContinuation = [assistantMsg, toolResultsMsg];
 
-          addLog('INFO', 'Context Manager', `Retrying continuation with only tool results (no history)`);
+          addLog('INFO', 'Context Manager', `Retrying continuation with assistant + tool results (no history)`);
 
           continuationResponse = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
