@@ -1024,8 +1024,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         { role: 'user', content: toolResults },
       ];
 
+      // CRITICAL: Estimate tokens before continuation to prevent overflow
+      // The continuation call with tool results is where 203K+ token errors occur
+      let continuationTokens = estimateTokens(currentMessages);
+      const CONTINUATION_TOKEN_LIMIT = 180000;
+
+      if (continuationTokens > CONTINUATION_TOKEN_LIMIT) {
+        addLog('WARN', 'Context Manager', `Continuation messages exceed limit (${continuationTokens.toLocaleString()} tokens), truncating history`);
+
+        // Strategy: Keep only the most recent context + current assistant response + tool results
+        // Drop older messages from the beginning
+        const assistantMsg = { role: 'assistant', content: currentResponse.content };
+        const toolResultsMsg = { role: 'user', content: toolResults };
+
+        // Try with last 3 messages of previous context
+        const previousContext = currentMessages.slice(-5, -2); // Keep some context but not all
+        currentMessages = [
+          ...previousContext,
+          assistantMsg,
+          toolResultsMsg,
+        ];
+
+        continuationTokens = estimateTokens(currentMessages);
+
+        if (continuationTokens > CONTINUATION_TOKEN_LIMIT) {
+          addLog('WARN', 'Context Manager', `Still too large (${continuationTokens.toLocaleString()} tokens), using minimal context`);
+          // Last resort: Only assistant response + tool results (no history)
+          currentMessages = [
+            assistantMsg,
+            toolResultsMsg,
+          ];
+          continuationTokens = estimateTokens(currentMessages);
+        }
+
+        addLog('INFO', 'Context Manager', `Continuation context: ${currentMessages.length} messages, ~${continuationTokens.toLocaleString()} tokens`);
+      }
+
       const continuationStartTime = Date.now();
-      const continuationResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      let continuationResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'x-api-key': providerConfig.apiKey,
@@ -1043,7 +1079,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!continuationResponse.ok) {
         const errorText = await continuationResponse.text();
-        throw new Error(`AI API error on continuation: ${continuationResponse.status} - ${errorText}`);
+
+        // Check if it's a token overflow error during continuation
+        if (errorText.includes('prompt is too long') || errorText.includes('tokens >')) {
+          addLog('ERROR', 'Context Manager', `Continuation token overflow despite estimation, retrying with absolute minimal context`);
+
+          // Retry with ONLY the tool results (no previous context, no assistant response)
+          const toolResultsMsg = { role: 'user', content: toolResults };
+          const minimalContinuation = [toolResultsMsg];
+
+          addLog('INFO', 'Context Manager', `Retrying continuation with only tool results (no history)`);
+
+          continuationResponse = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': providerConfig.apiKey,
+              'anthropic-version': '2023-06-01',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: providerConfig.model,
+              max_tokens: config.maxTokens || 4096,
+              temperature: config.temperature || 0.7,
+              messages: minimalContinuation,
+              tools: requestBody.tools,
+            }),
+          });
+
+          if (!continuationResponse.ok) {
+            const retryErrorText = await continuationResponse.text();
+            throw new Error(`AI API error on continuation retry: ${continuationResponse.status} - ${retryErrorText}`);
+          }
+
+          currentMessages = minimalContinuation;
+          addLog('SUCCESS', 'Context Manager', `Continuation retry successful with minimal context`);
+        } else {
+          throw new Error(`AI API error on continuation: ${continuationResponse.status} - ${errorText}`);
+        }
       }
 
       currentResponse = await continuationResponse.json();
