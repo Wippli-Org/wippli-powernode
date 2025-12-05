@@ -78,12 +78,12 @@
                         adobeViewer.getAnnotationManager().then(function(annotationManager) {
                             console.log('Annotation Manager initialized');
 
-                            // Register callback for annotation events
+                            // Register callback for ALL annotation events
                             annotationManager.registerEventListener(
                                 function(event) {
                                     console.log('Annotation Event:', event.type, event.data);
 
-                                    // Store annotations in localStorage for retrieval
+                                    // Store event in localStorage
                                     const storageKey = 'pdf-annotations-' + pdfName;
                                     const existingAnnotations = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
@@ -94,13 +94,42 @@
                                     });
 
                                     localStorage.setItem(storageKey, JSON.stringify(existingAnnotations));
+
+                                    // Also save full snapshot of ALL annotations after each event
+                                    annotationManager.getAnnotations().then(function(allAnnotations) {
+                                        const snapshotKey = 'pdf-annotations-snapshot-' + pdfName;
+                                        localStorage.setItem(snapshotKey, JSON.stringify({
+                                            timestamp: new Date().toISOString(),
+                                            pdfName: pdfName,
+                                            pdfUrl: pdfUrl,
+                                            annotationCount: allAnnotations.length,
+                                            annotations: allAnnotations
+                                        }));
+
+                                        // Post message to parent window (if embedded in iframe)
+                                        if (window.parent !== window) {
+                                            window.parent.postMessage({
+                                                type: 'PDF_ANNOTATION_UPDATE',
+                                                pdfName: pdfName,
+                                                eventType: event.type,
+                                                annotationCount: allAnnotations.length,
+                                                annotations: allAnnotations
+                                            }, '*');
+                                        }
+                                    }).catch(function(error) {
+                                        console.error('Failed to get annotations snapshot:', error);
+                                    });
                                 },
                                 {
                                     listenOn: [
                                         "ANNOTATION_ADDED",
                                         "ANNOTATION_UPDATED",
                                         "ANNOTATION_DELETED",
-                                        "ANNOTATION_CLICKED"
+                                        "ANNOTATION_CLICKED",
+                                        "ANNOTATION_SELECTED",
+                                        "ANNOTATION_UNSELECTED",
+                                        "ANNOTATION_MOUSE_ENTER",
+                                        "ANNOTATION_MOUSE_LEAVE"
                                     ]
                                 }
                             );
@@ -122,6 +151,45 @@
                                     a.click();
                                 });
                             };
+
+                            // Expose API to get annotation snapshot from localStorage
+                            window.getAnnotationSnapshot = function() {
+                                const snapshotKey = 'pdf-annotations-snapshot-' + pdfName;
+                                const snapshot = localStorage.getItem(snapshotKey);
+                                return snapshot ? JSON.parse(snapshot) : null;
+                            };
+
+                            // Expose API to get annotation event history from localStorage
+                            window.getAnnotationHistory = function() {
+                                const storageKey = 'pdf-annotations-' + pdfName;
+                                const history = localStorage.getItem(storageKey);
+                                return history ? JSON.parse(history) : [];
+                            };
+
+                            // Listen for messages from parent window requesting annotations
+                            window.addEventListener('message', function(event) {
+                                if (event.data.type === 'REQUEST_PDF_ANNOTATIONS') {
+                                    annotationManager.getAnnotations().then(function(annotations) {
+                                        event.source.postMessage({
+                                            type: 'PDF_ANNOTATIONS_RESPONSE',
+                                            pdfName: pdfName,
+                                            annotations: annotations,
+                                            timestamp: new Date().toISOString()
+                                        }, event.origin);
+                                    }).catch(function(error) {
+                                        console.error('Failed to get annotations for parent:', error);
+                                    });
+                                }
+                            });
+
+                            // Send initial load message to parent
+                            if (window.parent !== window) {
+                                window.parent.postMessage({
+                                    type: 'PDF_VIEWER_READY',
+                                    pdfName: pdfName,
+                                    pdfUrl: pdfUrl
+                                }, '*');
+                            }
                         }).catch(function(error) {
                             console.error('Failed to get Annotation Manager:', error);
                         });

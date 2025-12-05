@@ -30,22 +30,56 @@ https://powernode.wippli.ai/pdf-viewer/?pdf=https%3A%2F%2Fwipplipdfgen.blob.core
 - Prologistik HUB branding
 
 ## Annotation Capture
-The viewer automatically captures all annotation events:
+The viewer automatically captures **ALL** annotation events:
 - `ANNOTATION_ADDED` - When a new comment/annotation is created
 - `ANNOTATION_UPDATED` - When an annotation is modified
 - `ANNOTATION_DELETED` - When an annotation is removed
 - `ANNOTATION_CLICKED` - When a user clicks on an annotation
+- `ANNOTATION_SELECTED` - When an annotation is selected
+- `ANNOTATION_UNSELECTED` - When an annotation is deselected
+- `ANNOTATION_MOUSE_ENTER` - When mouse enters an annotation
+- `ANNOTATION_MOUSE_LEAVE` - When mouse leaves an annotation
 
-Annotations are stored in browser localStorage with key: `pdf-annotations-{filename}`
+### Storage
+1. **Event History**: All events stored in `localStorage` with key: `pdf-annotations-{filename}`
+2. **Current Snapshot**: Full annotation data stored in `localStorage` with key: `pdf-annotations-snapshot-{filename}`
+3. **Parent Window Messages**: Real-time updates posted to parent iframe (if embedded)
 
 ### JavaScript APIs
 Open browser console and use:
 ```javascript
-// Get all current annotations
+// Get all current annotations (live from Adobe API)
 window.getAnnotations().then(annotations => console.log(annotations));
 
-// Export annotations as JSON file
+// Get latest snapshot from localStorage
+const snapshot = window.getAnnotationSnapshot();
+console.log(snapshot);
+
+// Get full event history from localStorage
+const history = window.getAnnotationHistory();
+console.log(history);
+
+// Export all annotations as JSON file
 window.exportAnnotations();
+```
+
+### Parent Window Integration
+If embedded in an iframe, the viewer automatically:
+1. Sends `PDF_VIEWER_READY` message when loaded
+2. Sends `PDF_ANNOTATION_UPDATE` message on every annotation change
+3. Responds to `REQUEST_PDF_ANNOTATIONS` messages with `PDF_ANNOTATIONS_RESPONSE`
+
+Example parent window code:
+```javascript
+// Listen for annotation updates
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'PDF_ANNOTATION_UPDATE') {
+        console.log('Annotations updated:', event.data.annotations);
+    }
+});
+
+// Request current annotations
+iframe.contentWindow.postMessage({ type: 'REQUEST_PDF_ANNOTATIONS' }, '*');
 ```
 
 ## Configuration
