@@ -27,7 +27,7 @@ https://powernode.wippli.ai/pdf-viewer/?pdf=https%3A%2F%2Fwipplipdfgen.blob.core
 - Prologistik HUB branding
 
 ## Configuration
-- **Adobe Client ID**: `8ec8993527e84d5faa0d057b329563b4`
+- **Adobe Client ID**: `edeb93a6c51c4b1abd9c3d0001a784f2`
 - **Registered Domain**: `powernode.wippli.ai` (enables commenting)
 - **Embed Mode**: `SIZED_CONTAINER`
 - **Tools Enabled**: Download, Print, Annotations, Comments
