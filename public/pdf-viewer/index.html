@@ -39,6 +39,10 @@
         const pdfUrl = urlParams.get('pdf');
         const pdfName = urlParams.get('name') || 'document.pdf';
 
+        // Extract wippli-id from PDF name (format: questionnaire-{wippli-id}.pdf or similar)
+        const wippliIdMatch = pdfName.match(/wippli[_-](\d+)/i) || pdfName.match(/(\d{3,})/);
+        const wippliId = wippliIdMatch ? wippliIdMatch[1] : null;
+
         if (!pdfUrl) {
             document.getElementById('adobe-dc-view').innerHTML = '<div class="error">Error: No PDF URL provided. Use ?pdf=<url>&name=<filename></div>';
         } else {
@@ -64,6 +68,7 @@
                         }
                     }, {
                         embedMode: "FULL_WINDOW",
+                        defaultViewMode: "FIT_PAGE",
                         showDownloadPDF: true,
                         showPrintPDF: true,
                         showAnnotationTools: true,
@@ -71,19 +76,66 @@
                         includePDFAnnotations: true,
                         enableFormFilling: true,
                         showLeftHandPanel: true,
-                        showPageControls: true,
-                        showAnnotationTools: true
+                        showPageControls: true
                     }).then(function(adobeViewer) {
                         // Get the Annotation Manager to track comment changes
                         adobeViewer.getAnnotationManager().then(function(annotationManager) {
-                            console.log('Annotation Manager initialized');
+                            console.log('Annotation Manager initialized', wippliId ? '(wippli-id: ' + wippliId + ')' : '(no wippli-id)');
+
+                            // Load existing annotations from Azure if wippli-id is available
+                            if (wippliId) {
+                                fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName))
+                                    .then(function(response) { return response.json(); })
+                                    .then(function(data) {
+                                        if (data.annotations && data.annotations.length > 0) {
+                                            console.log('Loaded ' + data.annotations.length + ' existing annotations');
+                                            // Import existing annotations into the PDF
+                                            annotationManager.addAnnotations(data.annotations).catch(function(error) {
+                                                console.error('Failed to load annotations:', error);
+                                            });
+                                        }
+                                    })
+                                    .catch(function(error) {
+                                        console.error('Failed to fetch existing annotations:', error);
+                                    });
+                            }
+
+                            // Function to save annotations to Azure
+                            function saveAnnotationsToAzure() {
+                                if (!wippliId) {
+                                    console.log('No wippli-id, skipping Azure save');
+                                    return;
+                                }
+
+                                annotationManager.getAnnotations().then(function(annotations) {
+                                    fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            annotations: annotations,
+                                            pdfUrl: pdfUrl
+                                        })
+                                    })
+                                    .then(function(response) { return response.json(); })
+                                    .then(function(result) {
+                                        console.log('Annotations saved to Azure:', result);
+                                    })
+                                    .catch(function(error) {
+                                        console.error('Failed to save annotations to Azure:', error);
+                                    });
+                                }).catch(function(error) {
+                                    console.error('Failed to get annotations for Azure save:', error);
+                                });
+                            }
 
                             // Register callback for ALL annotation events
                             annotationManager.registerEventListener(
                                 function(event) {
                                     console.log('Annotation Event:', event.type, event.data);
 
-                                    // Store event in localStorage
+                                    // Store event in localStorage (backup)
                                     const storageKey = 'pdf-annotations-' + pdfName;
                                     const existingAnnotations = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
@@ -95,6 +147,16 @@
 
                                     localStorage.setItem(storageKey, JSON.stringify(existingAnnotations));
 
+                                    // Save annotations to Azure on every change (debounced)
+                                    if (event.type === 'ANNOTATION_ADDED' || event.type === 'ANNOTATION_UPDATED' || event.type === 'ANNOTATION_DELETED') {
+                                        // Clear previous timeout if exists
+                                        if (window.saveAnnotationsTimeout) {
+                                            clearTimeout(window.saveAnnotationsTimeout);
+                                        }
+                                        // Debounce save by 2 seconds
+                                        window.saveAnnotationsTimeout = setTimeout(saveAnnotationsToAzure, 2000);
+                                    }
+
                                     // Also save full snapshot of ALL annotations after each event
                                     annotationManager.getAnnotations().then(function(allAnnotations) {
                                         const snapshotKey = 'pdf-annotations-snapshot-' + pdfName;
@@ -102,6 +164,7 @@
                                             timestamp: new Date().toISOString(),
                                             pdfName: pdfName,
                                             pdfUrl: pdfUrl,
+                                            wippliId: wippliId,
                                             annotationCount: allAnnotations.length,
                                             annotations: allAnnotations
                                         }));
@@ -111,6 +174,7 @@
                                             window.parent.postMessage({
                                                 type: 'PDF_ANNOTATION_UPDATE',
                                                 pdfName: pdfName,
+                                                wippliId: wippliId,
                                                 eventType: event.type,
                                                 annotationCount: allAnnotations.length,
                                                 annotations: allAnnotations
@@ -139,17 +203,36 @@
                                 return annotationManager.getAnnotations();
                             };
 
-                            // Expose API to save annotations as JSON
+                            // Expose API to manually save annotations to Azure
+                            window.saveAnnotations = function() {
+                                saveAnnotationsToAzure();
+                                return Promise.resolve({ success: true, message: 'Saving annotations to Azure...' });
+                            };
+
+                            // Expose API to export annotations as JSON file
                             window.exportAnnotations = function() {
                                 annotationManager.getAnnotations().then(function(annotations) {
                                     console.log('All Annotations:', annotations);
-                                    const blob = new Blob([JSON.stringify(annotations, null, 2)], { type: 'application/json' });
+                                    const data = {
+                                        wippliId: wippliId,
+                                        pdfName: pdfName,
+                                        pdfUrl: pdfUrl,
+                                        annotationCount: annotations.length,
+                                        annotations: annotations,
+                                        exportedAt: new Date().toISOString()
+                                    };
+                                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');
                                     a.href = url;
-                                    a.download = pdfName.replace('.pdf', '-annotations.json');
+                                    a.download = (wippliId ? 'wippli-' + wippliId : pdfName.replace('.pdf', '')) + '-annotations.json';
                                     a.click();
                                 });
+                            };
+
+                            // Expose wippli-id
+                            window.getWippliId = function() {
+                                return wippliId;
                             };
 
                             // Expose API to get annotation snapshot from localStorage
