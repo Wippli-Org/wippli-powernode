@@ -63,14 +63,68 @@
                             id: "questionnaire-pdf-" + Date.now()
                         }
                     }, {
-                        embedMode: "SIZED_CONTAINER",
+                        embedMode: "FULL_WINDOW",
                         showDownloadPDF: true,
                         showPrintPDF: true,
                         showAnnotationTools: true,
                         enableAnnotationAPIs: true,
-                        showCommentPanelButton: true,
+                        includePDFAnnotations: true,
+                        enableFormFilling: true,
                         showLeftHandPanel: true,
-                        includePDFAnnotations: true
+                        showPageControls: true,
+                        showAnnotationTools: true
+                    }).then(function(adobeViewer) {
+                        // Get the Annotation Manager to track comment changes
+                        adobeViewer.getAnnotationManager().then(function(annotationManager) {
+                            console.log('Annotation Manager initialized');
+
+                            // Register callback for annotation events
+                            annotationManager.registerEventListener(
+                                function(event) {
+                                    console.log('Annotation Event:', event.type, event.data);
+
+                                    // Store annotations in localStorage for retrieval
+                                    const storageKey = 'pdf-annotations-' + pdfName;
+                                    const existingAnnotations = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+                                    existingAnnotations.push({
+                                        timestamp: new Date().toISOString(),
+                                        eventType: event.type,
+                                        data: event.data
+                                    });
+
+                                    localStorage.setItem(storageKey, JSON.stringify(existingAnnotations));
+                                },
+                                {
+                                    listenOn: [
+                                        "ANNOTATION_ADDED",
+                                        "ANNOTATION_UPDATED",
+                                        "ANNOTATION_DELETED",
+                                        "ANNOTATION_CLICKED"
+                                    ]
+                                }
+                            );
+
+                            // Expose API to retrieve all annotations
+                            window.getAnnotations = function() {
+                                return annotationManager.getAnnotations();
+                            };
+
+                            // Expose API to save annotations as JSON
+                            window.exportAnnotations = function() {
+                                annotationManager.getAnnotations().then(function(annotations) {
+                                    console.log('All Annotations:', annotations);
+                                    const blob = new Blob([JSON.stringify(annotations, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = pdfName.replace('.pdf', '-annotations.json');
+                                    a.click();
+                                });
+                            };
+                        }).catch(function(error) {
+                            console.error('Failed to get Annotation Manager:', error);
+                        });
                     });
 
                 } catch(error) {

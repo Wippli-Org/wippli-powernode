@@ -22,14 +22,36 @@ https://powernode.wippli.ai/pdf-viewer/?pdf=https%3A%2F%2Fwipplipdfgen.blob.core
 
 ## Features
 - Adobe PDF Embed API with full commenting support
-- Annotation tools enabled
+- Annotation tools enabled (sticky notes, highlights, text comments, drawing tools)
+- Real-time annotation event tracking
+- Automatic annotation storage in browser localStorage
+- JavaScript APIs to retrieve and export annotations
 - Download button
 - Prologistik HUB branding
+
+## Annotation Capture
+The viewer automatically captures all annotation events:
+- `ANNOTATION_ADDED` - When a new comment/annotation is created
+- `ANNOTATION_UPDATED` - When an annotation is modified
+- `ANNOTATION_DELETED` - When an annotation is removed
+- `ANNOTATION_CLICKED` - When a user clicks on an annotation
+
+Annotations are stored in browser localStorage with key: `pdf-annotations-{filename}`
+
+### JavaScript APIs
+Open browser console and use:
+```javascript
+// Get all current annotations
+window.getAnnotations().then(annotations => console.log(annotations));
+
+// Export annotations as JSON file
+window.exportAnnotations();
+```
 
 ## Configuration
 - **Adobe Client ID**: `edeb93a6c51c4b1abd9c3d0001a784f2`
 - **Registered Domain**: `powernode.wippli.ai` (enables commenting)
-- **Embed Mode**: `SIZED_CONTAINER`
+- **Embed Mode**: `FULL_WINDOW` (required for commenting tools)
 - **Tools Enabled**: Download, Print, Annotations, Comments
 
 ## Integration
