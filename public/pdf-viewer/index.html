@@ -324,20 +324,36 @@
                             annotationManager.registerEventListener(
                                 function(event) {
                                     console.log('📝 Annotation Event:', event.type);
-                                    console.log('📝 Event data:', JSON.stringify(event.data).substring(0, 300));
+                                    console.log('📝 Event keys:', Object.keys(event));
+                                    console.log('📝 Event.data:', event.data);
+                                    console.log('📝 Event.data type:', typeof event.data, Array.isArray(event.data) ? 'ARRAY' : '');
+
+                                    // The annotation might be in event.data directly, or event.data[0], or event.data.annotation
+                                    var annotation = null;
+                                    if (event.data && !Array.isArray(event.data) && event.data.id) {
+                                        annotation = event.data;
+                                    } else if (Array.isArray(event.data) && event.data.length > 0 && event.data[0] && event.data[0].id) {
+                                        annotation = event.data[0];
+                                    }
+
+                                    console.log('📝 Extracted annotation:', annotation ? annotation.id : 'NONE');
 
                                     // Track annotations manually since getAnnotations() may not work
-                                    if (event.type === 'ANNOTATION_ADDED' && event.data) {
-                                        trackedAnnotations.push(event.data);
+                                    if (event.type === 'ANNOTATION_ADDED' && annotation) {
+                                        trackedAnnotations.push(annotation);
                                         console.log('📝 Added annotation to tracked array. Total:', trackedAnnotations.length);
-                                    } else if (event.type === 'ANNOTATION_UPDATED' && event.data && event.data.id) {
-                                        var idx = trackedAnnotations.findIndex(function(a) { return a.id === event.data.id; });
+                                    } else if (event.type === 'ANNOTATION_UPDATED' && annotation && annotation.id) {
+                                        var idx = trackedAnnotations.findIndex(function(a) { return a.id === annotation.id; });
                                         if (idx >= 0) {
-                                            trackedAnnotations[idx] = event.data;
+                                            trackedAnnotations[idx] = annotation;
                                             console.log('📝 Updated annotation in tracked array');
+                                        } else {
+                                            // If not found, add it
+                                            trackedAnnotations.push(annotation);
+                                            console.log('📝 Added missing annotation to tracked array');
                                         }
-                                    } else if (event.type === 'ANNOTATION_DELETED' && event.data && event.data.id) {
-                                        trackedAnnotations = trackedAnnotations.filter(function(a) { return a.id !== event.data.id; });
+                                    } else if (event.type === 'ANNOTATION_DELETED' && annotation && annotation.id) {
+                                        trackedAnnotations = trackedAnnotations.filter(function(a) { return a.id !== annotation.id; });
                                         console.log('📝 Removed annotation from tracked array. Total:', trackedAnnotations.length);
                                     }
 
