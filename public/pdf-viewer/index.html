@@ -172,73 +172,47 @@
             // Register SAVE_API callback to handle Adobe's built-in save and clear "Unsaved" indicator
             adobeDCView.registerCallback(
                 AdobeDC.View.Enum.CallbackType.SAVE_API,
-                        function(metaData, content, options) {
-                            console.log('Adobe SAVE_API called:', { metaData: metaData, options: options });
+                function(metaData, content, options) {
+                    console.log('Adobe SAVE_API called:', { metaData: metaData, options: options, contentSize: content ? content.byteLength : 0 });
 
-                            return new Promise(function(resolve, reject) {
-                                // Save annotations to Azure using the global annotation manager
-                                if (wippliId && globalAnnotationManager) {
-                                    // Get actual annotations from the annotation manager
-                                    globalAnnotationManager.getAnnotations().then(function(annotations) {
-                                        console.log('SAVE_API: Got ' + annotations.length + ' annotations to save');
-
-                                        fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                annotations: annotations,
-                                                pdfUrl: pdfUrl,
-                                                savedViaAdobeAPI: true
-                                            })
-                                        })
-                                        .then(function() {
-                                            console.log('✅ Adobe SAVE_API: Saved ' + annotations.length + ' annotations to Azure');
-                                            resolve({
-                                                code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
-                                                data: { metaData: metaData }
-                                            });
-                                        })
-                                        .catch(function(error) {
-                                            console.error('Adobe save failed:', error);
-                                            reject({
-                                                code: AdobeDC.View.Enum.ApiResponseCode.FAIL,
-                                                data: {}
-                                            });
-                                        });
-                                    }).catch(function(error) {
-                                        console.error('Failed to get annotations in SAVE_API:', error);
-                                        // Still resolve to clear "Unsaved" indicator
-                                        resolve({
-                                            code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
-                                            data: { metaData: metaData }
-                                        });
-                                    });
-                                } else {
-                                    // No wippliId or annotation manager not ready, just acknowledge the save
-                                    console.log('SAVE_API: No wippliId or annotationManager not ready');
-                                    resolve({
-                                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
-                                        data: { metaData: metaData }
-                                    });
-                                }
+                    // Save annotations in background, return SUCCESS immediately to clear "Unsaved"
+                    if (wippliId && globalAnnotationManager) {
+                        globalAnnotationManager.getAnnotations().then(function(annotations) {
+                            console.log('SAVE_API: Saving ' + annotations.length + ' annotations in background');
+                            fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ annotations: annotations, pdfUrl: pdfUrl })
+                            }).then(function() {
+                                console.log('✅ Annotations saved to Azure');
+                            }).catch(function(err) {
+                                console.error('Failed to save annotations:', err);
                             });
-                        },
-                        { autoSaveFrequency: 2, enableFocusPolling: true, showSaveButton: false }
-                    );
+                        });
+                    }
 
-                    // Build preview config
-                    var previewConfig = {
-                        embedMode: "FULL_WINDOW",
-                        defaultViewMode: "FIT_PAGE",
-                        showDownloadPDF: true,
-                        showPrintPDF: true,
-                        showAnnotationTools: true,
-                        enableAnnotationAPIs: true,
-                        includePDFAnnotations: true,
-                        enableFormFilling: true,
-                        showLeftHandPanel: true,
-                        showPageControls: true
-                    };
+                    // Return SUCCESS immediately to clear "Unsaved" indicator
+                    return Promise.resolve({
+                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                        data: { metaData: metaData }
+                    });
+                },
+                { autoSaveFrequency: 0, enableFocusPolling: false, showSaveButton: true }
+            );
+
+            // Build preview config
+            var previewConfig = {
+                embedMode: "FULL_WINDOW",
+                defaultViewMode: "FIT_PAGE",
+                showDownloadPDF: true,
+                showPrintPDF: true,
+                showAnnotationTools: true,
+                enableAnnotationAPIs: true,
+                includePDFAnnotations: true,
+                enableFormFilling: true,
+                showLeftHandPanel: true,
+                showPageControls: true
+            };
 
                     adobeDCView.previewFile({
                         content: {
