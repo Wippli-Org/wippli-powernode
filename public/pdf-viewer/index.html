@@ -78,8 +78,8 @@
         // URL format: .../prologistik-wippli-670/questionnaire-wippli-2025-12-07.pdf
         var wippliId = urlParams.get('wippliId') || null;
         if (!wippliId && pdfUrl) {
-            // Try to extract from URL path (e.g., prologistik-wippli-670)
-            const pathMatch = pdfUrl.match(/wippli-(\d+)\//i);
+            // Extract from container name: prologistik-wippli-XXX (NOT from filename which has date)
+            const pathMatch = pdfUrl.match(/prologistik-wippli-(\d+)/i);
             if (pathMatch) {
                 wippliId = pathMatch[1];
             }
