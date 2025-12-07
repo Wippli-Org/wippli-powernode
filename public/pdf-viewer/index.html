@@ -132,6 +132,51 @@
                         });
                     }
 
+                    // Register SAVE_API callback to handle Adobe's built-in save and clear "Unsaved" indicator
+                    adobeDCView.registerCallback(
+                        AdobeDC.View.Enum.CallbackType.SAVE_API,
+                        function(metaData, content, options) {
+                            console.log('Adobe SAVE_API called:', { metaData: metaData, options: options });
+
+                            return new Promise(function(resolve, reject) {
+                                // Save annotations to Azure
+                                if (wippliId) {
+                                    // Get annotations from content and save to Azure
+                                    fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            annotations: [],  // Will be populated by annotation manager
+                                            pdfUrl: pdfUrl,
+                                            savedViaAdobeAPI: true
+                                        })
+                                    })
+                                    .then(function() {
+                                        console.log('✅ Adobe save completed - "Unsaved" should clear');
+                                        resolve({
+                                            code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                                            data: { metaData: metaData }
+                                        });
+                                    })
+                                    .catch(function(error) {
+                                        console.error('Adobe save failed:', error);
+                                        reject({
+                                            code: AdobeDC.View.Enum.ApiResponseCode.FAIL,
+                                            data: {}
+                                        });
+                                    });
+                                } else {
+                                    // No wippliId, just acknowledge the save
+                                    resolve({
+                                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                                        data: { metaData: metaData }
+                                    });
+                                }
+                            });
+                        },
+                        { autoSaveFrequency: 2, enableFocusPolling: true, showSaveButton: false }
+                    );
+
                     // Build preview config
                     var previewConfig = {
                         embedMode: "FULL_WINDOW",
