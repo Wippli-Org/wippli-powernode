@@ -66,13 +66,17 @@
                         showPageControls: true
                     };
 
-                    // Add user profile if user info is available
-                    if (userId && userName && userEmail) {
+                    // Add user profile if user info is available (userEmail is optional)
+                    if (userId && userName) {
                         previewConfig.userProfile = {
                             userId: userId,
-                            userName: userName,
-                            userEmail: userEmail
+                            userName: userName
                         };
+
+                        // Add email if provided
+                        if (userEmail) {
+                            previewConfig.userProfile.userEmail = userEmail;
+                        }
 
                         // Add avatar if provided
                         if (userAvatar) {
@@ -84,7 +88,7 @@
                         console.warn('⚠️ User profile NOT configured. Missing:', {
                             userId: userId ? 'OK' : 'MISSING',
                             userName: userName ? 'OK' : 'MISSING',
-                            userEmail: userEmail ? 'OK' : 'MISSING'
+                            userEmail: userEmail ? 'OK (optional)' : 'not provided'
                         });
                     }
 
