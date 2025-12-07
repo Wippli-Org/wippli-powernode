@@ -38,8 +38,8 @@ export default async function handler(
   const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = blobServiceClient.getContainerClient(containerName);
 
-  // Ensure container exists
-  await containerClient.createIfNotExists({ access: 'blob' });
+  // Ensure container exists (private access - no public access allowed on this storage account)
+  await containerClient.createIfNotExists();
 
   const blobName = `${wippliId}/annotations.json`;
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
