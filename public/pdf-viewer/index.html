@@ -15,24 +15,63 @@
 
     <script src="https://acrobatservices.adobe.com/view-sdk/viewer.js"></script>
     <script type="text/javascript">
-        // Get PDF URL from query parameter
+        // Get PDF URL and user info from query parameters
         const urlParams = new URLSearchParams(window.location.search);
         const pdfUrl = urlParams.get('pdf');
         const pdfName = urlParams.get('name') || 'document.pdf';
 
-        // Extract wippli-id from PDF name (format: questionnaire-{wippli-id}.pdf or similar)
+        // Get user info from URL params
+        const userId = urlParams.get('userId') || null;
+        const userName = urlParams.get('userName') || 'Guest';
+        const userEmail = urlParams.get('userEmail') || null;
+
+        // Extract wippli-id from PDF name (format: questionnaire-wippli-123.pdf or similar)
         const wippliIdMatch = pdfName.match(/wippli[_-](\d+)/i) || pdfName.match(/(\d{3,})/);
         const wippliId = wippliIdMatch ? wippliIdMatch[1] : null;
+
+        console.log('PDF Viewer initialized:', {
+            pdfName: pdfName,
+            wippliId: wippliId,
+            userId: userId,
+            userName: userName
+        });
 
         if (!pdfUrl) {
             document.getElementById('adobe-dc-view').innerHTML = '<div class="error">Error: No PDF URL provided. Use ?pdf=<url>&name=<filename></div>';
         } else {
             document.addEventListener("adobe_dc_view_sdk.ready", function() {
                 try {
-                    var adobeDCView = new AdobeDC.View({
+                    // Configure user profile for commenting
+                    var viewerConfig = {
                         clientId: "edeb93a6c51c4b1abd9c3d0001a784f2",
                         divId: "adobe-dc-view"
-                    });
+                    };
+
+                    var adobeDCView = new AdobeDC.View(viewerConfig);
+
+                    // Build preview config with user profile
+                    var previewConfig = {
+                        embedMode: "FULL_WINDOW",
+                        defaultViewMode: "FIT_PAGE",
+                        showDownloadPDF: true,
+                        showPrintPDF: true,
+                        showAnnotationTools: true,
+                        enableAnnotationAPIs: true,
+                        includePDFAnnotations: true,
+                        enableFormFilling: true,
+                        showLeftHandPanel: true,
+                        showPageControls: true
+                    };
+
+                    // Add user profile if user info is available
+                    if (userId && userName && userEmail) {
+                        previewConfig.userProfile = {
+                            userId: userId,
+                            userName: userName,
+                            userEmail: userEmail
+                        };
+                        console.log('User profile configured:', previewConfig.userProfile);
+                    }
 
                     adobeDCView.previewFile({
                         content: {
@@ -44,18 +83,7 @@
                             fileName: pdfName,
                             id: "questionnaire-pdf-" + Date.now()
                         }
-                    }, {
-                        embedMode: "FULL_WINDOW",
-                        defaultViewMode: "FIT_PAGE",
-                        showDownloadPDF: true,
-                        showPrintPDF: true,
-                        showAnnotationTools: true,
-                        enableAnnotationAPIs: true,
-                        includePDFAnnotations: true,
-                        enableFormFilling: true,
-                        showLeftHandPanel: true,
-                        showPageControls: true
-                    }).then(function(adobeViewer) {
+                    }, previewConfig).then(function(adobeViewer) {
                         // Get the Annotation Manager to track comment changes
                         adobeViewer.getAnnotationManager().then(function(annotationManager) {
                             console.log('Annotation Manager initialized', wippliId ? '(wippli-id: ' + wippliId + ')' : '(no wippli-id)');
