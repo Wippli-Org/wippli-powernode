@@ -26,9 +26,16 @@
         const userEmail = urlParams.get('userEmail') || null;
         const userAvatar = urlParams.get('userAvatar') || null;
 
-        // Extract wippli-id from PDF name (format: questionnaire-wippli-123.pdf or similar)
-        const wippliIdMatch = pdfName.match(/wippli[_-](\d+)/i) || pdfName.match(/(\d{3,})/);
-        const wippliId = wippliIdMatch ? wippliIdMatch[1] : null;
+        // Get wippliId from URL params (preferred) or extract from PDF URL path
+        // URL format: .../prologistik-wippli-670/questionnaire-wippli-2025-12-07.pdf
+        let wippliId = urlParams.get('wippliId') || null;
+        if (!wippliId && pdfUrl) {
+            // Try to extract from URL path (e.g., prologistik-wippli-670)
+            const pathMatch = pdfUrl.match(/wippli-(\d+)\//i);
+            if (pathMatch) {
+                wippliId = pathMatch[1];
+            }
+        }
 
         console.log('PDF Viewer initialized:', {
             pdfName: pdfName,
@@ -52,7 +59,35 @@
 
                     var adobeDCView = new AdobeDC.View(viewerConfig);
 
-                    // Build preview config with user profile
+                    // Register user profile callback BEFORE previewFile (required for annotation attribution)
+                    if (userId && userName) {
+                        var userProfileConfig = {
+                            userProfile: {
+                                name: userName,
+                                firstName: userName.split(' ')[0] || userName,
+                                lastName: userName.split(' ').slice(1).join(' ') || '',
+                                email: userEmail || ''
+                            }
+                        };
+
+                        adobeDCView.registerCallback(
+                            AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API,
+                            function() {
+                                return new Promise(function(resolve) {
+                                    resolve(userProfileConfig);
+                                });
+                            }
+                        );
+
+                        console.log('✅ User profile registered via callback:', userProfileConfig.userProfile);
+                    } else {
+                        console.warn('⚠️ User profile NOT configured. Missing:', {
+                            userId: userId ? 'OK' : 'MISSING',
+                            userName: userName ? 'OK' : 'MISSING'
+                        });
+                    }
+
+                    // Build preview config
                     var previewConfig = {
                         embedMode: "FULL_WINDOW",
                         defaultViewMode: "FIT_PAGE",
@@ -65,32 +100,6 @@
                         showLeftHandPanel: true,
                         showPageControls: true
                     };
-
-                    // Add user profile if user info is available (userEmail is optional)
-                    if (userId && userName) {
-                        previewConfig.userProfile = {
-                            userId: userId,
-                            userName: userName
-                        };
-
-                        // Add email if provided
-                        if (userEmail) {
-                            previewConfig.userProfile.userEmail = userEmail;
-                        }
-
-                        // Add avatar if provided
-                        if (userAvatar) {
-                            previewConfig.userProfile.userIcon = userAvatar;
-                        }
-
-                        console.log('✅ User profile configured:', previewConfig.userProfile);
-                    } else {
-                        console.warn('⚠️ User profile NOT configured. Missing:', {
-                            userId: userId ? 'OK' : 'MISSING',
-                            userName: userName ? 'OK' : 'MISSING',
-                            userEmail: userEmail ? 'OK (optional)' : 'not provided'
-                        });
-                    }
 
                     adobeDCView.previewFile({
                         content: {
