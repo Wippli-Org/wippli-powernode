@@ -24,6 +24,7 @@
         const userId = urlParams.get('userId') || null;
         const userName = urlParams.get('userName') || 'Guest';
         const userEmail = urlParams.get('userEmail') || null;
+        const userAvatar = urlParams.get('userAvatar') || null;
 
         // Extract wippli-id from PDF name (format: questionnaire-wippli-123.pdf or similar)
         const wippliIdMatch = pdfName.match(/wippli[_-](\d+)/i) || pdfName.match(/(\d{3,})/);
@@ -33,7 +34,8 @@
             pdfName: pdfName,
             wippliId: wippliId,
             userId: userId,
-            userName: userName
+            userName: userName,
+            userAvatar: userAvatar ? 'provided' : 'none'
         });
 
         if (!pdfUrl) {
@@ -70,6 +72,12 @@
                             userName: userName,
                             userEmail: userEmail
                         };
+
+                        // Add avatar if provided
+                        if (userAvatar) {
+                            previewConfig.userProfile.userIcon = userAvatar;
+                        }
+
                         console.log('User profile configured:', previewConfig.userProfile);
                     }
 
