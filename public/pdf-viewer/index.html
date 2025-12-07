@@ -221,6 +221,15 @@
                 showPageControls: true
             };
 
+                    // CRITICAL: Document ID must be CONSISTENT across page loads
+                    // Adobe tracks annotations by document ID - if it changes, annotations are lost!
+                    // Use wippliId + pdfName hash to create stable ID
+                    var documentId = wippliId
+                        ? 'wippli-' + wippliId + '-' + pdfName.replace(/[^a-zA-Z0-9]/g, '')
+                        : 'doc-' + pdfName.replace(/[^a-zA-Z0-9]/g, '');
+
+                    console.log('📄 Document ID (consistent):', documentId);
+
                     adobeDCView.previewFile({
                         content: {
                             location: {
@@ -229,7 +238,7 @@
                         },
                         metaData: {
                             fileName: pdfName,
-                            id: "questionnaire-pdf-" + Date.now()
+                            id: documentId  // FIXED: Consistent ID based on wippliId
                         }
                     }, previewConfig).then(function(adobeViewer) {
                         // Get the Annotation Manager to track comment changes
@@ -262,6 +271,16 @@
                                         } else {
                                             console.log('No existing annotations found for this wippliId');
                                         }
+
+                                        // Debug: Test getAnnotations() after initial load (with delay)
+                                        setTimeout(function() {
+                                            annotationManager.getAnnotations().then(function(initialAnnotations) {
+                                                console.log('🔍 DEBUG: Initial getAnnotations() returned:', initialAnnotations.length);
+                                                if (initialAnnotations.length > 0) {
+                                                    console.log('🔍 DEBUG: First annotation:', JSON.stringify(initialAnnotations[0]).substring(0, 300));
+                                                }
+                                            });
+                                        }, 2000);
                                     })
                                     .catch(function(error) {
                                         console.error('Failed to fetch existing annotations:', error);
@@ -467,6 +486,29 @@
                                 return history ? JSON.parse(history) : [];
                             };
 
+                            // BACKUP: Periodic auto-save every 30 seconds
+                            // This catches annotations even when ANNOTATION_ADDED event doesn't fire (known Adobe bug with notes)
+                            if (wippliId) {
+                                setInterval(function() {
+                                    annotationManager.getAnnotations().then(function(annotations) {
+                                        if (annotations.length > 0 && JSON.stringify(annotations) !== JSON.stringify(trackedAnnotations)) {
+                                            console.log('🔄 Auto-save: Found ' + annotations.length + ' annotations (periodic check)');
+                                            trackedAnnotations = annotations.slice();
+                                            fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ annotations: annotations, pdfUrl: pdfUrl })
+                                            }).then(function() {
+                                                console.log('🔄 Auto-save: Annotations saved to Azure');
+                                            }).catch(function(err) {
+                                                console.error('🔄 Auto-save failed:', err);
+                                            });
+                                        }
+                                    });
+                                }, 30000); // Every 30 seconds
+                                console.log('🔄 Periodic auto-save enabled (every 30 seconds)');
+                            }
+
                             // Listen for messages from parent window requesting annotations
                             window.addEventListener('message', function(event) {
                                 if (event.data.type === 'REQUEST_PDF_ANNOTATIONS') {
@@ -491,6 +533,19 @@
                                     pdfUrl: pdfUrl
                                 }, '*');
                             }
+
+                            // Last resort: Save on page unload
+                            window.addEventListener('beforeunload', function() {
+                                if (wippliId && trackedAnnotations.length > 0) {
+                                    // Use synchronous XMLHttpRequest for beforeunload
+                                    var xhr = new XMLHttpRequest();
+                                    xhr.open('POST', 'https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), false);
+                                    xhr.setRequestHeader('Content-Type', 'application/json');
+                                    xhr.send(JSON.stringify({ annotations: trackedAnnotations, pdfUrl: pdfUrl }));
+                                    console.log('💾 Saved annotations on page unload');
+                                }
+                            });
+
                         }).catch(function(error) {
                             console.error('Failed to get Annotation Manager:', error);
                         });
