@@ -176,10 +176,11 @@
                     console.log('Adobe SAVE_API called:', { metaData: metaData, options: options, contentSize: content ? content.byteLength : 0 });
 
                     // Save annotations in background, return SUCCESS immediately to clear "Unsaved"
+                    console.log('SAVE_API: wippliId=' + wippliId + ', globalAnnotationManager=' + (globalAnnotationManager ? 'SET' : 'NULL'));
                     if (wippliId && globalAnnotationManager) {
                         globalAnnotationManager.getAnnotations().then(function(annotations) {
-                            console.log('SAVE_API: Saving ' + annotations.length + ' annotations in background');
-                            console.log('SAVE_API: Annotation data:', JSON.stringify(annotations).substring(0, 500));
+                            console.log('SAVE_API: getAnnotations returned ' + annotations.length + ' annotations');
+                            console.log('SAVE_API: Full annotation data:', JSON.stringify(annotations));
                             fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -319,7 +320,8 @@
                             // Register callback for ALL annotation events
                             annotationManager.registerEventListener(
                                 function(event) {
-                                    console.log('Annotation Event:', event.type, event.data);
+                                    console.log('📝 Annotation Event:', event.type);
+                                    console.log('📝 Event data:', JSON.stringify(event.data).substring(0, 300));
 
                                     // Store event in localStorage (backup)
                                     const storageKey = 'pdf-annotations-' + pdfName;
