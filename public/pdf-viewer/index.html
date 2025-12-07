@@ -179,6 +179,7 @@
                     if (wippliId && globalAnnotationManager) {
                         globalAnnotationManager.getAnnotations().then(function(annotations) {
                             console.log('SAVE_API: Saving ' + annotations.length + ' annotations in background');
+                            console.log('SAVE_API: Annotation data:', JSON.stringify(annotations).substring(0, 500));
                             fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -237,11 +238,18 @@
                                     .then(function(response) { return response.json(); })
                                     .then(function(data) {
                                         if (data.annotations && data.annotations.length > 0) {
-                                            console.log('Loaded ' + data.annotations.length + ' existing annotations');
+                                            console.log('Loaded ' + data.annotations.length + ' existing annotations from Azure');
+                                            console.log('Annotation data to import:', JSON.stringify(data.annotations).substring(0, 500));
                                             // Import existing annotations into the PDF
-                                            annotationManager.addAnnotations(data.annotations).catch(function(error) {
-                                                console.error('Failed to load annotations:', error);
-                                            });
+                                            annotationManager.addAnnotations(data.annotations)
+                                                .then(function(result) {
+                                                    console.log('✅ Annotations imported successfully:', result);
+                                                })
+                                                .catch(function(error) {
+                                                    console.error('❌ Failed to import annotations:', error);
+                                                });
+                                        } else {
+                                            console.log('No existing annotations found for this wippliId');
                                         }
                                     })
                                     .catch(function(error) {
