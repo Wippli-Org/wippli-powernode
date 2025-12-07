@@ -35,6 +35,7 @@
             wippliId: wippliId,
             userId: userId,
             userName: userName,
+            userEmail: userEmail,
             userAvatar: userAvatar ? 'provided' : 'none'
         });
 
@@ -78,7 +79,13 @@
                             previewConfig.userProfile.userIcon = userAvatar;
                         }
 
-                        console.log('User profile configured:', previewConfig.userProfile);
+                        console.log('✅ User profile configured:', previewConfig.userProfile);
+                    } else {
+                        console.warn('⚠️ User profile NOT configured. Missing:', {
+                            userId: userId ? 'OK' : 'MISSING',
+                            userName: userName ? 'OK' : 'MISSING',
+                            userEmail: userEmail ? 'OK' : 'MISSING'
+                        });
                     }
 
                     adobeDCView.previewFile({
