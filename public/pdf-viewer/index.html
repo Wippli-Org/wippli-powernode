@@ -2,60 +2,220 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>PDF Viewer - Prologistik HUB</title>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+    <title>PDF Viewer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { padding: 15px; background: #f5f5f5; height: 100vh; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .logo img { height: 31px; padding-top: 5px; }
-        .open-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: #d32f2f; color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 500; transition: background 0.2s; }
-        .open-btn:hover { background: #b71c1c; }
-        #adobe-dc-view { width: 100%; height: calc(100vh - 90px); border-radius: 15px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: white; }
-        .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-family: 'Barlow', sans-serif; font-size: 12px; color: #666666; }
-        .error { padding: 40px; text-align: center; color: #c62828; background: #ffebee; border-radius: 8px; margin: 20px; }
+        body { height: 100vh; overflow: hidden; }
+        #adobe-dc-view { width: 100%; height: 100vh; }
+        .error { padding: 40px; text-align: center; color: #c62828; background: #ffebee; }
+
+        /* Save status indicator */
+        #save-status {
+            position: fixed;
+            top: 8px;
+            right: 12px;
+            z-index: 9999;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        #save-status.saving {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        #save-status.saved {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        #save-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        #save-status .spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        #save-status .icon {
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">
-            <img src="https://wipplipdfgen.blob.core.windows.net/prologistik-assets/prologistik-HUB.svg" alt="Prologistik HUB">
-        </div>
-        <a href="#" id="download-btn" class="open-btn" target="_blank" download>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M14,2H6C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V8L14,2z M6,20V4h7v5h5v11H6z M11,19h2v-4h3l-4-4l-4,4h3V19z"/></svg>
-            Download PDF
-        </a>
-    </div>
+    <div id="save-status" style="display: none;"></div>
     <div id="adobe-dc-view"></div>
-    <div class="footer">
-        <span>©2025 proLogistik HUB</span>
-        <span>Powered by Wippli®</span>
-    </div>
 
     <script src="https://acrobatservices.adobe.com/view-sdk/viewer.js"></script>
     <script type="text/javascript">
-        // Get PDF URL from query parameter
+        // Global reference to annotation manager (set after preview loads)
+        var globalAnnotationManager = null;
+        // Global array to track annotations (since getAnnotations() may not work)
+        var trackedAnnotations = [];
+
+        // Get PDF URL and user info from query parameters
         const urlParams = new URLSearchParams(window.location.search);
         const pdfUrl = urlParams.get('pdf');
         const pdfName = urlParams.get('name') || 'document.pdf';
 
-        // Extract wippli-id from URL path (format: prologistik-wippli-XXX in container name)
-        const wippliIdMatch = pdfUrl ? pdfUrl.match(/prologistik-wippli-(\d+)/i) : null;
-        const wippliId = wippliIdMatch ? wippliIdMatch[1] : null;
-        console.log('Extracted wippliId:', wippliId, 'from URL:', pdfUrl);
+        // Get user info from URL params (can be overridden by blob storage)
+        var userId = urlParams.get('userId') || null;
+        var userName = urlParams.get('userName') || null;
+        var userEmail = urlParams.get('userEmail') || null;
+        var userAvatar = urlParams.get('userAvatar') || null;
 
-        if (!pdfUrl) {
-            document.getElementById('adobe-dc-view').innerHTML = '<div class="error">Error: No PDF URL provided. Use ?pdf=<url>&name=<filename></div>';
-        } else {
-            // Update download button
-            document.getElementById('download-btn').href = pdfUrl;
+        // Get wippliId from URL params (preferred) or extract from PDF URL path
+        // URL format: .../prologistik-wippli-670/questionnaire-wippli-2025-12-07.pdf
+        var wippliId = urlParams.get('wippliId') || null;
+        if (!wippliId && pdfUrl) {
+            // Extract from container name: prologistik-wippli-XXX (NOT from filename which has date)
+            const pathMatch = pdfUrl.match(/prologistik-wippli-(\d+)/i);
+            if (pathMatch) {
+                wippliId = pathMatch[1];
+            }
+        }
 
-            document.addEventListener("adobe_dc_view_sdk.ready", function() {
-                try {
-                    var adobeDCView = new AdobeDC.View({
-                        clientId: "edeb93a6c51c4b1abd9c3d0001a784f2",
-                        divId: "adobe-dc-view"
+        console.log('PDF Viewer initializing...', {
+            pdfName: pdfName,
+            wippliId: wippliId,
+            userFromUrl: userId ? 'yes' : 'no'
+        });
+
+        // Function to fetch user info from blob storage
+        async function fetchUserInfo() {
+            if (!wippliId) return null;
+
+            try {
+                const response = await fetch('https://powernode.wippli.ai/api/user-info?wippliId=' + wippliId);
+                const data = await response.json();
+                if (data.userId && data.userName) {
+                    console.log('✅ User info loaded from blob storage:', data.userName);
+                    return data;
+                }
+            } catch (error) {
+                console.warn('Failed to fetch user info from blob:', error);
+            }
+            return null;
+        }
+
+        // Initialize PDF viewer (called after user info is resolved)
+        async function initializeViewer() {
+            // If no user info from URL, try to fetch from blob storage
+            if (!userId && wippliId) {
+                const blobUserInfo = await fetchUserInfo();
+                if (blobUserInfo) {
+                    userId = blobUserInfo.userId;
+                    userName = blobUserInfo.userName;
+                    userEmail = blobUserInfo.userEmail || null;
+                    userAvatar = blobUserInfo.userAvatar || null;
+                }
+            }
+
+            // Default to Guest if still no user info
+            if (!userName) userName = 'Guest';
+
+            console.log('PDF Viewer initialized:', {
+                pdfName: pdfName,
+                wippliId: wippliId,
+                userId: userId,
+                userName: userName,
+                userEmail: userEmail,
+                userAvatar: userAvatar ? 'provided' : 'none'
+            });
+
+            // Configure user profile for commenting
+            var viewerConfig = {
+                clientId: "edeb93a6c51c4b1abd9c3d0001a784f2",
+                divId: "adobe-dc-view"
+            };
+
+            var adobeDCView = new AdobeDC.View(viewerConfig);
+
+            // Register user profile callback BEFORE previewFile (required for annotation attribution)
+            if (userId && userName && userName !== 'Guest') {
+                var userProfileConfig = {
+                    userProfile: {
+                        name: userName,
+                        firstName: userName.split(' ')[0] || userName,
+                        lastName: userName.split(' ').slice(1).join(' ') || '',
+                        email: userEmail || ''
+                    }
+                };
+
+                adobeDCView.registerCallback(
+                    AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API,
+                    function() {
+                        return new Promise(function(resolve) {
+                            resolve(userProfileConfig);
+                        });
+                    }
+                );
+
+                console.log('✅ User profile registered via callback:', userProfileConfig.userProfile);
+            } else {
+                console.warn('⚠️ User profile NOT configured. Missing:', {
+                    userId: userId ? 'OK' : 'MISSING',
+                    userName: (userName && userName !== 'Guest') ? 'OK' : 'MISSING'
+                });
+            }
+
+            // Register SAVE_API callback to handle Adobe's built-in save and clear "Unsaved" indicator
+            adobeDCView.registerCallback(
+                AdobeDC.View.Enum.CallbackType.SAVE_API,
+                function(metaData, content, options) {
+                    console.log('Adobe SAVE_API called:', { metaData: metaData, options: options, contentSize: content ? content.byteLength : 0 });
+
+                    // Save annotations in background, return SUCCESS immediately to clear "Unsaved"
+                    console.log('SAVE_API: wippliId=' + wippliId + ', trackedAnnotations=' + trackedAnnotations.length);
+                    if (wippliId) {
+                        // Use trackedAnnotations array instead of getAnnotations()
+                        console.log('SAVE_API: Saving ' + trackedAnnotations.length + ' tracked annotations');
+                        console.log('SAVE_API: Data:', JSON.stringify(trackedAnnotations).substring(0, 500));
+                        fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ annotations: trackedAnnotations, pdfUrl: pdfUrl })
+                        }).then(function() {
+                            console.log('✅ Annotations saved to Azure');
+                        }).catch(function(err) {
+                            console.error('Failed to save annotations:', err);
+                        });
+                    }
+
+                    // Return SUCCESS immediately to clear "Unsaved" indicator
+                    return Promise.resolve({
+                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                        data: { metaData: metaData }
                     });
+                },
+                { autoSaveFrequency: 0, enableFocusPolling: false, showSaveButton: true }
+            );
+
+            // Build preview config
+            var previewConfig = {
+                embedMode: "FULL_WINDOW",
+                defaultViewMode: "FIT_PAGE",
+                showDownloadPDF: true,
+                showPrintPDF: true,
+                showAnnotationTools: true,
+                enableAnnotationAPIs: true,
+                includePDFAnnotations: true,
+                enableFormFilling: true,
+                showLeftHandPanel: true,
+                showPageControls: true
+            };
 
                     adobeDCView.previewFile({
                         content: {
@@ -67,21 +227,12 @@
                             fileName: pdfName,
                             id: "questionnaire-pdf-" + Date.now()
                         }
-                    }, {
-                        embedMode: "FULL_WINDOW",
-                        defaultViewMode: "FIT_PAGE",
-                        showDownloadPDF: true,
-                        showPrintPDF: true,
-                        showAnnotationTools: true,
-                        enableAnnotationAPIs: true,
-                        includePDFAnnotations: true,
-                        enableFormFilling: true,
-                        showLeftHandPanel: true,
-                        showPageControls: true
-                    }).then(function(adobeViewer) {
+                    }, previewConfig).then(function(adobeViewer) {
                         // Get the Annotation Manager to track comment changes
                         adobeViewer.getAnnotationManager().then(function(annotationManager) {
-                            console.log('Annotation Manager initialized', wippliId ? '(wippli-id: ' + wippliId + ')' : '(no wippli-id)');
+                            // Store globally so SAVE_API callback can access it
+                            globalAnnotationManager = annotationManager;
+                            console.log('Annotation Manager initialized and stored globally', wippliId ? '(wippli-id: ' + wippliId + ')' : '(no wippli-id)');
 
                             // Load existing annotations from Azure if wippli-id is available
                             if (wippliId) {
@@ -89,16 +240,52 @@
                                     .then(function(response) { return response.json(); })
                                     .then(function(data) {
                                         if (data.annotations && data.annotations.length > 0) {
-                                            console.log('Loaded ' + data.annotations.length + ' existing annotations');
+                                            console.log('✅ Loaded ' + data.annotations.length + ' existing annotations from Azure');
+                                            console.log('Annotation data to import:', JSON.stringify(data.annotations).substring(0, 500));
+
+                                            // Add loaded annotations to trackedAnnotations array
+                                            trackedAnnotations = data.annotations.slice(); // Make a copy
+                                            console.log('✅ Populated trackedAnnotations with ' + trackedAnnotations.length + ' annotations');
+
                                             // Import existing annotations into the PDF
-                                            annotationManager.addAnnotations(data.annotations).catch(function(error) {
-                                                console.error('Failed to load annotations:', error);
-                                            });
+                                            annotationManager.addAnnotations(data.annotations)
+                                                .then(function(result) {
+                                                    console.log('✅ Annotations imported to PDF viewer:', result);
+                                                })
+                                                .catch(function(error) {
+                                                    console.error('❌ Failed to import annotations to PDF:', error);
+                                                });
+                                        } else {
+                                            console.log('No existing annotations found for this wippliId');
                                         }
                                     })
                                     .catch(function(error) {
                                         console.error('Failed to fetch existing annotations:', error);
                                     });
+                            }
+
+                            // Save status UI helper
+                            var saveStatusEl = document.getElementById('save-status');
+                            var hideStatusTimeout = null;
+
+                            function showSaveStatus(status, message) {
+                                if (hideStatusTimeout) clearTimeout(hideStatusTimeout);
+                                saveStatusEl.style.display = 'flex';
+                                saveStatusEl.className = status;
+
+                                if (status === 'saving') {
+                                    saveStatusEl.innerHTML = '<div class="spinner"></div>' + message;
+                                } else if (status === 'saved') {
+                                    saveStatusEl.innerHTML = '<span class="icon">✓</span>' + message;
+                                    hideStatusTimeout = setTimeout(function() {
+                                        saveStatusEl.style.display = 'none';
+                                    }, 3000);
+                                } else if (status === 'error') {
+                                    saveStatusEl.innerHTML = '<span class="icon">✕</span>' + message;
+                                    hideStatusTimeout = setTimeout(function() {
+                                        saveStatusEl.style.display = 'none';
+                                    }, 5000);
+                                }
                             }
 
                             // Function to save annotations to Azure
@@ -108,33 +295,67 @@
                                     return;
                                 }
 
-                                annotationManager.getAnnotations().then(function(annotations) {
-                                    fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify({
-                                            annotations: annotations,
-                                            pdfUrl: pdfUrl
-                                        })
+                                showSaveStatus('saving', 'Saving...');
+                                console.log('saveAnnotationsToAzure: Saving ' + trackedAnnotations.length + ' tracked annotations');
+
+                                // Use trackedAnnotations instead of getAnnotations()
+                                fetch('https://powernode.wippli.ai/api/annotations?wippliId=' + wippliId + '&pdfName=' + encodeURIComponent(pdfName), {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        annotations: trackedAnnotations,
+                                        pdfUrl: pdfUrl
                                     })
-                                    .then(function(response) { return response.json(); })
-                                    .then(function(result) {
-                                        console.log('Annotations saved to Azure:', result);
-                                    })
-                                    .catch(function(error) {
-                                        console.error('Failed to save annotations to Azure:', error);
-                                    });
-                                }).catch(function(error) {
-                                    console.error('Failed to get annotations for Azure save:', error);
+                                })
+                                .then(function(response) { return response.json(); })
+                                .then(function(result) {
+                                    console.log('✅ Annotations saved to Azure:', result);
+                                    showSaveStatus('saved', 'Saved');
+                                })
+                                .catch(function(error) {
+                                    console.error('Failed to save annotations to Azure:', error);
+                                    showSaveStatus('error', 'Save failed');
                                 });
                             }
 
                             // Register callback for ALL annotation events
                             annotationManager.registerEventListener(
                                 function(event) {
-                                    console.log('Annotation Event:', event.type, event.data);
+                                    console.log('📝 Annotation Event:', event.type);
+                                    console.log('📝 Event keys:', Object.keys(event));
+                                    console.log('📝 Event.data:', event.data);
+                                    console.log('📝 Event.data type:', typeof event.data, Array.isArray(event.data) ? 'ARRAY' : '');
+
+                                    // The annotation might be in event.data directly, or event.data[0], or event.data.annotation
+                                    var annotation = null;
+                                    if (event.data && !Array.isArray(event.data) && event.data.id) {
+                                        annotation = event.data;
+                                    } else if (Array.isArray(event.data) && event.data.length > 0 && event.data[0] && event.data[0].id) {
+                                        annotation = event.data[0];
+                                    }
+
+                                    console.log('📝 Extracted annotation:', annotation ? annotation.id : 'NONE');
+
+                                    // Track annotations manually since getAnnotations() may not work
+                                    if (event.type === 'ANNOTATION_ADDED' && annotation) {
+                                        trackedAnnotations.push(annotation);
+                                        console.log('📝 Added annotation to tracked array. Total:', trackedAnnotations.length);
+                                    } else if (event.type === 'ANNOTATION_UPDATED' && annotation && annotation.id) {
+                                        var idx = trackedAnnotations.findIndex(function(a) { return a.id === annotation.id; });
+                                        if (idx >= 0) {
+                                            trackedAnnotations[idx] = annotation;
+                                            console.log('📝 Updated annotation in tracked array');
+                                        } else {
+                                            // If not found, add it
+                                            trackedAnnotations.push(annotation);
+                                            console.log('📝 Added missing annotation to tracked array');
+                                        }
+                                    } else if (event.type === 'ANNOTATION_DELETED' && annotation && annotation.id) {
+                                        trackedAnnotations = trackedAnnotations.filter(function(a) { return a.id !== annotation.id; });
+                                        console.log('📝 Removed annotation from tracked array. Total:', trackedAnnotations.length);
+                                    }
 
                                     // Store event in localStorage (backup)
                                     const storageKey = 'pdf-annotations-' + pdfName;
@@ -279,10 +500,17 @@
                         });
                     });
 
-                } catch(error) {
+        } // end initializeViewer function
+
+        // Main initialization
+        if (!pdfUrl) {
+            document.getElementById('adobe-dc-view').innerHTML = '<div class="error">Error: No PDF URL provided. Use ?pdf=<url>&name=<filename></div>';
+        } else {
+            document.addEventListener("adobe_dc_view_sdk.ready", function() {
+                initializeViewer().catch(function(error) {
                     document.getElementById('adobe-dc-view').innerHTML = '<div class="error">Error loading PDF: ' + error.message + '</div>';
                     console.error('Adobe viewer error:', error);
-                }
+                });
             });
         }
     </script>
