@@ -143,33 +143,28 @@
 
             var adobeDCView = new AdobeDC.View(viewerConfig);
 
-            // Register user profile callback BEFORE previewFile (required for annotation attribution)
-            if (userId && userName && userName !== 'Guest') {
-                var userProfileConfig = {
-                    userProfile: {
-                        name: userName,
-                        firstName: userName.split(' ')[0] || userName,
-                        lastName: userName.split(' ').slice(1).join(' ') || '',
-                        email: userEmail || ''
-                    }
-                };
-
-                adobeDCView.registerCallback(
-                    AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API,
-                    function() {
-                        return new Promise(function(resolve) {
-                            resolve(userProfileConfig);
+            // ALWAYS register user profile callback (matching monorepo pattern exactly)
+            // CRITICAL: Must return { code: SUCCESS, data: { userProfile: {...} } }
+            // NOT just { userProfile: {...} } - the code and data wrapper are REQUIRED!
+            adobeDCView.registerCallback(
+                AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API,
+                function() {
+                    return new Promise(function(resolve) {
+                        resolve({
+                            code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                            data: {
+                                userProfile: {
+                                    name: userName || 'Guest',
+                                    firstName: userName ? userName.split(' ')[0] : 'Guest',
+                                    lastName: userName ? userName.split(' ').slice(1).join(' ') : '',
+                                    email: userEmail || ''
+                                }
+                            }
                         });
-                    }
-                );
-
-                console.log('✅ User profile registered via callback:', userProfileConfig.userProfile);
-            } else {
-                console.warn('⚠️ User profile NOT configured. Missing:', {
-                    userId: userId ? 'OK' : 'MISSING',
-                    userName: (userName && userName !== 'Guest') ? 'OK' : 'MISSING'
-                });
-            }
+                    });
+                }
+            );
+            console.log('✅ User profile callback registered (with code+data wrapper):', { name: userName || 'Guest', email: userEmail || '' });
 
             // Register SAVE_API callback to handle Adobe's built-in save and clear "Unsaved" indicator
             adobeDCView.registerCallback(
