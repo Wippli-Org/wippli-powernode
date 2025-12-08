@@ -58,7 +58,7 @@
     <div id="save-status" style="display: none;"></div>
     <div id="adobe-dc-view"></div>
 
-    <script src="https://acrobatservices.adobe.com/view-sdk/viewer.js"></script>
+    <script src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
     <script type="text/javascript">
         // Global reference to annotation manager (set after preview loads)
         var globalAnnotationManager = null;
@@ -207,21 +207,12 @@
                 { autoSaveFrequency: 0, enableFocusPolling: false, showSaveButton: true }
             );
 
-            // Build preview config
-            // CRITICAL: Do NOT use includePDFAnnotations: true - it makes event.data empty!
-            // The working implementation in wippli monorepo does NOT use includePDFAnnotations
+            // Build preview config - MATCH WORKING MONOREPO IMPLEMENTATION EXACTLY
             var previewConfig = {
-                embedMode: "FULL_WINDOW",
-                defaultViewMode: "FIT_PAGE",
-                showDownloadPDF: true,
-                showPrintPDF: true,
-                showAnnotationTools: true,
                 enableAnnotationAPIs: true,
-                // includePDFAnnotations: false means event.data WILL contain annotation data
-                showCommentsPanel: true,
-                enableFormFilling: true,
-                showLeftHandPanel: true,
-                showPageControls: true
+                embedMode: "FULL_WINDOW",
+                showAnnotationTools: true,
+                showCommentsPanel: true
             };
 
                     // CRITICAL: Document ID must be CONSISTENT across page loads
